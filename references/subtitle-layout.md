@@ -372,6 +372,56 @@ ffmpeg -y -i f24.png -vf "crop=560:110:280:585,scale=1680:330" z.png
 > 换一首歌就换一个载体：写校园的用作业本，写旅途的用票根，写告白的用信纸。
 > 不要所有歌都用同一块纸牌。
 
+### 片头标题：用 VideoGen 生成，别后期叠
+
+**后期把字幕叠到生成画面上，是必败的**：纸页在动、镜头在推，叠上去的字却是死的，
+一眼就露馅。所以片头标题要**连画面一起生成，信息烧进视频里**。
+
+关键技巧：**别让模型写中文**。模型渲染汉字几乎必糊。正确做法是分两步：
+
+**第一步，自己合成首帧**（用 ASS / ffmpeg，文字 100% 正确）：
+
+```bash
+# 拿影片自己的某一帧当底，把标题页叠上去
+ffmpeg -y -copyts -ss 3.4 -i base.mp4 \
+  -vf "ass=subs.ass:fontsdir=..." -frames:v 1 title_frame.png
+```
+
+**第二步，交给 VideoGen 图生视频**，只让它做运动：
+
+- `image` = 上一步的 PNG；`last_image` 也传同一张 → 末帧回到首帧，抑制漂移
+- `seconds` 6，`resolution` 1080P，`enable_audio` false（音轨在后面统一接）
+- prompt 里必须写死："hanging paper page and every character of the writing on it
+  must stay perfectly sharp, stable and completely unchanged for the entire shot"
+- `negative_prompt` 必写：warped text, distorted characters, extra text, changing
+  letters, melting letters, moving or rotating the paper, rippling paper
+- 运动幅度要小。微风摆动 + 极缓推进就够，幅度一大字必变形
+
+**第三步，拼接时只换画面，不动音轨**：
+
+```bash
+ffmpeg -i gen.mp4 -i base.mp4 -filter_complex \
+"[0:v]trim=0:5.8,setpts=PTS-STARTPTS[vt];\
+ [1:v]trim=5.8:270,setpts=PTS-STARTPTS[vb];\
+ [vt][vb]concat=n=2:v=1:a=0[v]" -map "[v]" base2.mp4
+```
+
+这样音画不会重新对轴，也不用重排整首歌。代价只是原片最前面几秒的画面被替换——
+那本来就是前奏没有人声的地方。
+
+**第四步，把标题从 lines.json 里删掉**。信息已经在画面里了，
+再叠一遍就是双重标题。`build_lines` 里留个开关：
+
+```python
+TITLE_BAKED = True        # 标题已生成进画面，这里就不再叠字幕
+if not TITLE_BAKED:
+    items.insert(0, dict(...))
+```
+
+**关于角标**：生成片带平台水印（"AI生成"），位置通常和原片水印一样，
+会被同一条 `delogo` 一起抹掉。是否保留由你决定——要留就把它排除在 delogo 区域外，
+或对该段单独处理。
+
 ### 三个可直接套用的取色
 
 以本站这部纸雕 MV 为例（`ink` / `edge` 都是 0–255 的 RGB）：
