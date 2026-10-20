@@ -283,14 +283,21 @@ def emit(out, item, grid):
                 sway = float(mv.get("sway", 0)) * (idx - (n - 1) / 2)
                 dur = int(mv.get("dur") or max(300, (t_end - t_on) * 1000))
                 x1, y1 = x + d0[0] + sway * 0.35, yc + d0[1]
-                x2, y2 = x + d1[0] + sway, yc + d1[1]
+                # d1_i：单个字额外的终点偏移，让一起飘的几个字散开、不贴在一起
+                extra = (mv.get("d1_i") or {}).get(idx) or (mv.get("d1_i") or {}).get(str(idx)) or [0, 0]
+                x2, y2 = x + d1[0] + sway + extra[0], yc + d1[1] + extra[1]
                 r0 = mv.get("frz0", rot)
                 r1 = mv.get("frz1", rot)
-                pos_s = "\\move(%.1f,%.1f,%.1f,%.1f,0,%d)" % (x1, y1, x2, y2, dur)
-                rot_s = "\\frz%.2f\\t(0,%d,\\frz%.2f)" % (r0, dur, r1)
+                # t0：轨迹的统一起跑时刻（绝对秒）。多字一起飘时必须给，否则各飘各的
+                t1 = 0
+                if mv.get("t0"):
+                    t1 = max(0, int((float(mv["t0"]) - t_on) * 1000))
+                pos_s = "\\move(%.1f,%.1f,%.1f,%.1f,%d,%d)" % (x1, y1, x2, y2, t1, t1 + dur)
+                rot_s = "\\frz%.2f\\t(%d,%d,\\frz%.2f)" % (r0, t1, t1 + dur, r1)
                 sc = float(mv.get("scale") or 0)
                 if sc:
-                    rot_s += "\\t(0,%d,\\fscx%d\\fscy%d)" % (dur, int(sc * 100), int(sc * 100))
+                    rot_s += "\\t(%d,%d,\\fscx%d\\fscy%d)" % (
+                        t1, t1 + dur, int(sc * 100), int(sc * 100))
                 fin, fout = mv.get("fade", [260, 220])
                 anim = "%s\\fad(%d,%d)" % (rot_s, fin, fout)
                 anchor = (x1, y1)
