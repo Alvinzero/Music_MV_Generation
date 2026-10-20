@@ -58,11 +58,16 @@ def pad_of(fs):
     return max(8, int(round(fs * PAD_R)))
 
 
-def head(font, sizes):
+def head(font, sizes, scene_sizes=()):
     st = []
     for fs in sizes:
         st.append("Style: C%d,%s,%d,%s,%s,%s,%s,0,0,0,0,100,100,0.5,0,3,%d,4,5,0,0,0,1"
                   % (fs, font, fs, bgr_a(INK), bgr_a(INK), bgr_a(PAPER), bgr_a(SHADOW), pad_of(fs)))
+    for fs in scene_sizes:
+        # BorderStyle=1：描边 + 投影，没有纸卡；描边色由事件里的 c 决定
+        st.append("Style: S%d,%s,%d,%s,%s,%s,%s,0,0,0,0,100,100,3,0,1,%d,5,5,0,0,0,1"
+                  % (fs, font, fs, bgr_a(INK), bgr_a(INK), bgr_a(PAPER), bgr_a(SHADOW),
+                     max(6, int(round(fs * 0.07)))))
     return """[Script Info]
 ScriptType: v4.00+
 PlayResX: 1920
@@ -136,6 +141,7 @@ def emit(out, item, grid):
     else:                                   # 兜底：老写法 place T/M/B
         cy = {"T": 96, "M": 420}.get(item.get("place", "B"), 1000)
     accent = -1 if is_title else int(item.get("accent", 0))
+    scene = item.get("mode") == "scene"
     emph = {int(k): float(v) for k, v in (item.get("emph") or {}).items()}
 
     # 题字整块快速浮出，不跟着唱词慢慢铺
@@ -160,7 +166,8 @@ def emit(out, item, grid):
         for j, ch in enumerate(chunk):
             s = emph.get(cstart + j, 1.0)
             fs = int(round(fs0 * s))
-            widths.append((fs, fs + 2 * pad_of(fs)))
+            # 场景模式没有纸卡，字宽按字号走
+            widths.append((fs, int(round(fs * 1.06)) if scene else fs + 2 * pad_of(fs)))
         total = sum(w for _, w in widths) + (len(chunk) - 1) * GAP
         left = min(max(cx - total / 2, SAFE_X), 1920 - SAFE_X - total)
 
@@ -177,12 +184,19 @@ def emit(out, item, grid):
             cur += tile + GAP
 
             is_accent = (idx == accent)
-            fill, ink = (CORAL, CORAL_INK) if is_accent else (PAPER, INK)
-            anim = "\\fscx88\\fscy88\\t(0,80,\\fscx100\\fscy100)\\fad(36,120)"
-            out.append("Dialogue: 0,%s,%s,C%d,,0,0,0,,"
+            if scene:
+                ink = item.get("ink", (228, 213, 196))
+                edge = item.get("edge", (10, 43, 82))
+                style = "S%d" % fs
+                anim = "\\fad(90,160)"
+            else:
+                edge, ink = (CORAL, CORAL_INK) if is_accent else (PAPER, INK)
+                style = "C%d" % fs
+                anim = "\\fscx88\\fscy88\\t(0,80,\\fscx100\\fscy100)\\fad(36,120)"
+            out.append("Dialogue: 0,%s,%s,%s,,0,0,0,,"
                        "{\\an5\\pos(%.1f,%.1f)\\frz%.2f%s\\1c%s\\2c&HFF000000&\\3c%s\\4c%s}%s"
-                       % (ts(t_on), ts(t_end), fs, x, cy + dy, rot, anim,
-                          bgr(ink), bgr(fill), bgr(SHADOW), ch))
+                       % (ts(t_on), ts(t_end), style, x, cy + dy, rot, anim,
+                          bgr(ink), bgr(edge), bgr(edge), ch))
 
 
 def main():
@@ -197,14 +211,17 @@ def main():
         items = json.load(f)
     grid = BeatGrid(a.beats)
 
-    sizes = set()
+    sizes, scene_sizes = set(), set()
     for it in items:
+        if it.get("mode") == "scene":
+            scene_sizes.add(int(it.get("fs", FS)))
+            continue
         fs0 = int(it.get("fs", 120 if it.get("title") else FS))
         emph = {int(k): float(v) for k, v in (it.get("emph") or {}).items()}
         sizes.add(fs0)
         for v in emph.values():
             sizes.add(int(round(fs0 * v)))
-    lines = [head(a.font, sorted(sizes))]
+    lines = [head(a.font, sorted(sizes), sorted(scene_sizes))]
 
     for it in items:
         emit(lines, it, grid)
