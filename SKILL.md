@@ -209,7 +209,39 @@ ffmpeg -y -i out/base.mp4 -i song.mp3 -filter_complex_script out/filter_final.tx
 
 ### 10. 封面
 
-选最有辨识度的一帧（主角完整、情绪正面），底部压纸带放片名，导出 1920×1080 PNG + 1280×720 JPG。
+**不要直接抓一帧当封面。** 抓帧是"截图"，封面是"海报"——需要独立构图：
+主角、情绪、留白、标题区，四样都要设计。
+
+**① ImageGen 生成海报底图，底部预留空白纸带**
+
+```
+... The lower quarter of the frame is a wide, completely blank cream paper band
+with subtle fibre texture and a soft shadow along its top edge, empty and clean,
+reserved for a title. Absolutely no text, no letters, no characters anywhere.
+```
+
+尺寸按 16:9 要（如 1536×864）。两主角背对夕阳、纸飞机、晾衣绳、纸鸽——
+这些都是片子里出现过的元素，封面要能一眼认出是同一部片。
+
+**② 量出纸带上沿，字库排字**
+
+```python
+# 沿中列从下往上找亮度骤降处 = 纸带上沿
+for y in range(h-1, 0, -1):
+    if g[y, w//2] < 200:
+        print("纸带上沿 y =", y+1); break
+```
+
+标题放纸带中上部、署名压在下三分之一，都居中。
+**字号按占比定，不是按纸带比例拍脑袋**：封面标题占画面宽 **35–45%**。
+
+**③ 导出两版**：1920×1080 PNG（母版）+ 1280×720 JPG（平台用）。
+
+⚠️ **纸带高度决定字号上限**。四字标题的字号约等于纸带高度的 0.75 倍就到顶了，
+再大就顶出纸带、压到画面。所以生成底图时就要把纸带留够——
+我这次纸带只占 29%，标题最大只能到 36%，再多就没有余量。
+
+⚠️ **缩到 375px 宽自检**，和片头同一个标准。
 
 ---
 
