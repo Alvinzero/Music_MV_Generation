@@ -441,14 +441,51 @@ negative 挂 `text / letters / Chinese characters`。**少一处它就会自己�
 
 **② 取一帧，把字排到载体上（字库，零错）**
 
-**③ 推镜在后期做，让画面和字同源**
+**③ 让这一帧动起来（两种，按需要选）**
+
+**③-a 只有推镜（静态感强，但最稳）**
 
 ```bash
-ffmpeg -i still.png -vf "scale=2880:1620,\
- zoompan=z='min(1.26+0.00035*on,1.34)':d=144:\
- x='max(0,1377-(iw/zoom)/2)':y='max(0,537-(ih/zoom)/2)':\
+ffmpeg -i still.png -vf "scale=3840:2160,\
+ zoompan=z='min(1.74+0.00035*on,1.84)':d=144:\
+ x='max(0,1836-(iw/zoom)/2)':y='max(0,716-(ih/zoom)/2)':\
  s=1920x1080:fps=24" -t 6 -c:v libx264 -crf 17 title.mp4
 ```
+
+**③-b 图生视频（纸页会摆、鸽子会飞，但要多一道裁切）**
+
+把 `still.png` 喂给 VideoGen 做 image-to-video，`last_image` 传同一张，
+prompt 反复强调 "the banner and every character printed on it must stay perfectly
+sharp, flat, stable and completely unchanged"，negative 挂 `warped text`,
+`changed characters`, `rippling paper`。
+
+**文字烧在首帧里，所以模型只做运动，字不会错**——这一路是可靠的。
+
+但有个必然的副作用：**模型会重新"看"一遍场景，把镜头拉远**。
+你喂进去的是 40% 的标题，出来只剩 25%。锁机位提示（locked-off camera,
+no zoom, no pull-back）拦不住，试两次都一样。
+
+所以 ③-b 之后必须补一道裁切，把占比拉回来：
+
+```bash
+# 裁掉 0.625 的面积再放大，标题从 25% 回到 40%
+ffmpeg -y -i gen.mp4 \
+  -vf "crop=1200:675:380:42,scale=1920:1080:flags=lanczos,\
+unsharp=5:5:0.45:5:5:0,format=yuv420p" -c:v libx264 -crf 17 title.mp4
+```
+
+裁完会软一点，但纸雕这种质感吃得住，加一道 `unsharp` 就够。
+
+**接缝用叠化，别硬切**：
+
+```bash
+[0:v]trim=0:6,setpts=PTS-STARTPTS,fps=24[t];
+[1:v]trim=5.7:270,setpts=PTS-STARTPTS,fps=24[b];
+[t][b]xfade=transition=fade:duration=0.3:offset=5.7
+```
+
+⚠️ `trim` 之后帧率信息会丢，`xfade` 会报 `current rate of 1/0 is invalid`。
+**两个分支都要在 `setpts` 后面补 `fps=24`**，否则滤镜图根本建不起来。
 
 **④ 拼到片头：只换画面，不动音轨**
 
