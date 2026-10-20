@@ -310,10 +310,11 @@ def emit(out, item, grid):
     if kind in ("banner", "plain"):
         ls = float(item.get("ls", 0))
         style = ("N%d" if kind == "banner" else "P%d") % fs0
-        ov = (r"{\an5\pos(%.1f,%.1f)\fsp%.1f"
+        an = int(item.get("an", 5))
+        ov = (r"{\an%d\pos(%.1f,%.1f)\fsp%.1f"
               r"\fscx97\fscy97\t(0,420,\fscx100\fscy100)\fad(340,300)"
               r"\1c%s\3c%s\4c%s}"
-              % (cx, cy, ls,
+              % (an, cx, cy, ls,
                  bgr(tuple(item.get("ink", (58, 48, 40)))),
                  bgr(tuple(item.get("paper", (246, 238, 224)))),
                  bgr(tuple(item.get("shadow", (150, 138, 126))))))
