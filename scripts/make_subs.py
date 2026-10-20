@@ -58,7 +58,7 @@ def pad_of(fs):
     return max(8, int(round(fs * PAD_R)))
 
 
-def head(font, sizes, scene_sizes=()):
+def head(font, sizes, scene_sizes=(), carrier_sizes=()):
     st = []
     for fs in sizes:
         st.append("Style: C%d,%s,%d,%s,%s,%s,%s,0,0,0,0,100,100,0.5,0,3,%d,4,5,0,0,0,1"
@@ -68,6 +68,13 @@ def head(font, sizes, scene_sizes=()):
         st.append("Style: S%d,%s,%d,%s,%s,%s,%s,0,0,0,0,100,100,3,0,1,%d,5,5,0,0,0,1"
                   % (fs, font, fs, bgr_a(INK), bgr_a(INK), bgr_a(PAPER), bgr_a(SHADOW),
                      max(6, int(round(fs * 0.07)))))
+    for fs in carrier_sizes:
+        # 载体模式：字没有纸卡，只留字本身，底托由矢量形状画
+        st.append("Style: B%d,%s,%d,%s,%s,%s,%s,0,0,0,0,100,100,0.5,0,1,0,0,5,0,0,0,1"
+                  % (fs, font, fs, bgr_a(INK), bgr_a(INK), bgr_a(PAPER), bgr_a(SHADOW)))
+    # 矢量形状（纸卡/气球底托），颜色由事件覆盖
+    st.append("Style: Shape,%s,60,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,"
+              "0,0,0,0,100,100,0,0,1,2,0,7,0,0,0,1" % font)
     return """[Script Info]
 ScriptType: v4.00+
 PlayResX: 1920
@@ -128,11 +135,67 @@ class BeatGrid:
         return [t0 + i * step for i in range(n)]
 
 
+def carrier_path(kind, fs):
+    """返回 dict(body, string, hilite, w, h, cy)。坐标以 0,0 为左上。"""
+    if kind == "balloon":
+        w = fs * 1.62
+        h = fs * 2.52
+        cx, cy = w / 2, h * 0.315
+        rx, ry = w * 0.435, h * 0.300
+        k = 0.5523
+        body = ("m %.1f %.1f b %.1f %.1f %.1f %.1f %.1f %.1f "
+                "b %.1f %.1f %.1f %.1f %.1f %.1f "
+                "b %.1f %.1f %.1f %.1f %.1f %.1f "
+                "b %.1f %.1f %.1f %.1f %.1f %.1f" % (
+                    cx, cy - ry,
+                    cx + rx * k, cy - ry, cx + rx, cy - ry * k, cx + rx, cy,
+                    cx + rx, cy + ry * k, cx + rx * k, cy + ry, cx, cy + ry,
+                    cx - rx * k, cy + ry, cx - rx, cy + ry * k, cx - rx, cy,
+                    cx - rx, cy - ry * k, cx - rx * k, cy - ry, cx, cy - ry))
+        # 气嘴
+        ky = cy + ry * 0.93
+        body += (" m %.1f %.1f l %.1f %.1f l %.1f %.1f l %.1f %.1f" % (
+            cx - fs * 0.062, ky, cx + fs * 0.062, ky,
+            cx, ky + fs * 0.105, cx - fs * 0.062, ky))
+        # 高光：左上角一枚小椭圆（用局部坐标，外框从 0,0 起）
+        hrx, hry = rx * 0.21, ry * 0.18
+        hil = ("m %.1f %.1f b %.1f %.1f %.1f %.1f %.1f %.1f "
+               "b %.1f %.1f %.1f %.1f %.1f %.1f "
+               "b %.1f %.1f %.1f %.1f %.1f %.1f "
+               "b %.1f %.1f %.1f %.1f %.1f %.1f" % (
+                   hrx, 0,
+                   hrx + hrx * k, 0, hrx * 2, hry - hry * k, hrx * 2, hry,
+                   hrx * 2, hry + hry * k, hrx + hrx * k, hry * 2, hrx, hry * 2,
+                   hrx - hrx * k, hry * 2, 0, hry + hry * k, 0, hry,
+                   0, hry - hry * k, hrx - hrx * k, 0, hrx, 0))
+        hil_off = (cx - rx * 0.42 - hrx, cy - ry * 0.40 - hry)
+        # 细绳：两段折线，带一点弧度感
+        ty = ky + fs * 0.10
+        string = ("m %.1f %.1f l %.1f %.1f l %.1f %.1f l %.1f %.1f "
+                  "l %.1f %.1f l %.1f %.1f" % (
+                      cx - 0.7, ty, cx + 0.7, ty, cx + 0.7, h * 0.72,
+                      cx + 2.0, h * 0.86, cx + 2.0, h * 0.995, cx + 0.6, h * 0.995))
+        return dict(body=body, string=string, hilite=hil, hil_off=hil_off), w, h, cy
+    if kind == "puzzle":
+        w = h = fs * 1.22
+        q = fs * 0.13
+        path = ("m %.1f %.1f l %.1f %.1f l %.1f 0 l %.1f %.1f "
+                "l %.1f 0 l %.1f %.1f l %.1f %.1f l %.1f %.1f "
+                "l %.1f %.1f l %.1f %.1f l %.1f %.1f l %.1f %.1f z") % (
+            q, 0, w * 0.5 - q, 0, w * 0.5 - q, -q,
+            w * 0.5 + q, -q, w * 0.5 + q, 0, w - q, 0,
+            w, q, w, h - q, w - q, h,
+            w * 0.5 + q, h, w * 0.5 - q, h, q, h)
+        return dict(body=path, string="", hilite="", hil_off=(0, 0)), w, h, h / 2
+    return dict(body="", string="", hilite="", hil_off=(0, 0)), 0, 0, 0
+
+
 def emit(out, item, grid):
     text = "".join(c for c in item["text"] if c.strip())
     if not text:
         return
     start, end = float(item["start"]), float(item["end"])
+    disp_end = float(item.get("hold_end", end))   # 只延长显示，不改逐字节奏
     is_title = bool(item.get("title"))
     fs0 = int(item.get("fs", 120 if is_title else FS))
     cx = float(item.get("x", 960))
@@ -142,6 +205,8 @@ def emit(out, item, grid):
         cy = {"T": 96, "M": 420}.get(item.get("place", "B"), 1000)
     accent = -1 if is_title else int(item.get("accent", 0))
     scene = item.get("mode") == "scene"
+    carrier = item.get("carrier")
+    mv_ok = bool(item.get("move"))
     tints = item.get("tints") or []
 
     def tint_of(i):
@@ -175,12 +240,14 @@ def emit(out, item, grid):
             s = emph.get(cstart + j, 1.0)
             fs = int(round(fs0 * s))
             # 场景模式没有纸卡，字宽按字号走
-            widths.append((fs, int(round(fs * 1.06)) if scene else fs + 2 * pad_of(fs)))
+            widths.append((fs, int(round(fs * 1.06)) if scene else
+                            (int(round(fs * 1.74)) if carrier else fs + 2 * pad_of(fs))))
         total = sum(w for _, w in widths) + (len(chunk) - 1) * GAP
         left = min(max(cx - total / 2, SAFE_X), 1920 - SAFE_X - total)
 
         cur = left
-        seg_end = times[cstart + len(chunk)] if cstart + len(chunk) < n else end + 0.28
+        seg_end = (times[cstart + len(chunk)] if cstart + len(chunk) < n
+                   else disp_end + 0.28)
         for j, ch in enumerate(chunk):
             fs, tile = widths[j]
             idx = cstart + j
@@ -203,11 +270,70 @@ def emit(out, item, grid):
                     edge, ink = tuple(t.get("paper", PAPER)), tuple(t.get("ink", INK))
                 else:
                     edge, ink = (CORAL, CORAL_INK) if is_accent else (PAPER, INK)
-                style = "C%d" % fs
+                style = ("B%d" % fs) if carrier else ("C%d" % fs)
                 anim = "\\fscx88\\fscy88\\t(0,80,\\fscx100\\fscy100)\\fad(36,120)"
-            out.append("Dialogue: 0,%s,%s,%s,,0,0,0,,"
-                       "{\\an5\\pos(%.1f,%.1f)\\frz%.2f%s\\1c%s\\2c&HFF000000&\\3c%s\\4c%s}%s"
-                       % (ts(t_on), ts(t_end), style, x, cy + dy, rot, anim,
+
+            # ---- 动作层：位移轨迹 ----
+            yc = cy + dy
+            only = item.get("move_i")
+            mv = item.get("move") if (mv_ok and (not only or idx in only)) else None
+            if mv:
+                d0 = mv.get("d0", [0, 0])
+                d1 = mv.get("d1", [0, 0])
+                sway = float(mv.get("sway", 0)) * (idx - (n - 1) / 2)
+                dur = int(mv.get("dur") or max(300, (t_end - t_on) * 1000))
+                x1, y1 = x + d0[0] + sway * 0.35, yc + d0[1]
+                x2, y2 = x + d1[0] + sway, yc + d1[1]
+                r0 = mv.get("frz0", rot)
+                r1 = mv.get("frz1", rot)
+                pos_s = "\\move(%.1f,%.1f,%.1f,%.1f,0,%d)" % (x1, y1, x2, y2, dur)
+                rot_s = "\\frz%.2f\\t(0,%d,\\frz%.2f)" % (r0, dur, r1)
+                sc = float(mv.get("scale") or 0)
+                if sc:
+                    rot_s += "\\t(0,%d,\\fscx%d\\fscy%d)" % (dur, int(sc * 100), int(sc * 100))
+                fin, fout = mv.get("fade", [260, 220])
+                anim = "%s\\fad(%d,%d)" % (rot_s, fin, fout)
+                anchor = (x1, y1)
+                mv_box = (x1, y1, x2, y2, dur)
+            else:
+                pos_s = "\\pos(%.1f,%.1f)" % (x, yc)
+                anchor = (x, yc)
+                rot_s = "\\frz%.2f" % rot
+                mv_box = None
+
+            # ---- 载体层：异形底托 ----
+            if carrier and not scene:
+                paths, cw, chh, cay = carrier_path(carrier, fs)
+                path = paths["body"]
+                if path:
+                    fills = item.get("carrier_fills") or [item.get("carrier_fill", (232, 156, 138))]
+                    cfill = tuple(fills[idx % len(fills)])
+                    cline = item.get("carrier_line", (150, 86, 70))
+                    lum = 0.299 * cfill[0] + 0.587 * cfill[1] + 0.114 * cfill[2]
+                    ink = item.get("glyph_ink") or ((74, 66, 68) if lum > 200 else (251, 245, 236))
+                    if mv_box:
+                        pos_shape = "\\move(%.1f,%.1f,%.1f,%.1f,0,%d)" % (
+                            mv_box[0] - cw / 2, mv_box[1] - cay,
+                            mv_box[2] - cw / 2, mv_box[3] - cay, mv_box[4])
+                    else:
+                        pos_shape = "\\pos(%.1f,%.1f)" % (anchor[0] - cw / 2, anchor[1] - cay)
+                    out.append(
+                        "Dialogue: 0,%s,%s,Shape,,0,0,0,,"
+                        "{\\an7%s\\p1\\bord2\\shad0\\1c%s\\3c%s}"
+                        "%s{\\p0}"
+                        % (ts(t_on), ts(t_end), pos_shape, bgr(cfill), bgr(cline), path))
+                    string = paths["string"]
+                    if string:
+                        out.append(
+                            "Dialogue: 0,%s,%s,Shape,,0,0,0,,"
+                            "{\an7%s\p1\bord0\shad0\1c%s\3c%s}%s{\p0}"
+                            % (ts(t_on), ts(t_end), pos_shape,
+                               bgr(item.get("string_color", (146, 118, 100))),
+                               bgr(item.get("string_color", (146, 118, 100))), string))
+
+            out.append("Dialogue: 1,%s,%s,%s,,0,0,0,,"
+                       "{\\an5%s%s\\1c%s\\2c&HFF000000&\\3c%s\\4c%s}%s"
+                       % (ts(t_on), ts(t_end), style, pos_s, anim,
                           bgr(ink), bgr(edge), bgr(edge), ch))
 
 
@@ -223,17 +349,19 @@ def main():
         items = json.load(f)
     grid = BeatGrid(a.beats)
 
-    sizes, scene_sizes = set(), set()
+    sizes, scene_sizes, carrier_sizes = set(), set(), set()
     for it in items:
         if it.get("mode") == "scene":
             scene_sizes.add(int(it.get("fs", FS)))
             continue
+        if it.get("carrier"):
+            carrier_sizes.add(int(it.get("fs", FS)))
         fs0 = int(it.get("fs", 120 if it.get("title") else FS))
         emph = {int(k): float(v) for k, v in (it.get("emph") or {}).items()}
         sizes.add(fs0)
         for v in emph.values():
             sizes.add(int(round(fs0 * v)))
-    lines = [head(a.font, sorted(sizes), sorted(scene_sizes))]
+    lines = [head(a.font, sorted(sizes), sorted(scene_sizes), sorted(carrier_sizes))]
 
     for it in items:
         emit(lines, it, grid)
