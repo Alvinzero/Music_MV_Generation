@@ -147,6 +147,27 @@ class BeatGrid:
         return [t0 + i * step for i in range(n)]
 
 
+def torn_rect(w, h, seed=7, jag=5.0, step=46):
+    """带毛边的矩形轮廓（撕纸），坐标 0..w / 0..h。"""
+    import random
+    rnd = random.Random(seed)
+    pts = []
+
+    def edge(x0, y0, x1, y1, nx, ny):
+        n = max(2, int(round(max(abs(x1 - x0), abs(y1 - y0)) / step)))
+        for i in range(n):
+            t = i / n
+            x = x0 + (x1 - x0) * t + nx * rnd.uniform(-jag, jag)
+            y = y0 + (y1 - y0) * t + ny * rnd.uniform(-jag, jag)
+            pts.append((x, y))
+
+    edge(0, 0, w, 0, 0, 1)
+    edge(w, 0, w, h, -1, 0)
+    edge(w, h, 0, h, 0, -1)
+    edge(0, h, 0, 0, 1, 0)
+    return "m " + " l ".join("%.1f %.1f" % p for p in pts) + " z"
+
+
 def carrier_path(kind, fs):
     """返回 dict(body, string, hilite, w, h, cy)。坐标以 0,0 为左上。"""
     if kind == "balloon":
@@ -208,10 +229,26 @@ def emit(out, item, grid):
         w = float(item.get("w", 300))
         th = float(item.get("th", 3))
         col = tuple(item.get("color", (110, 92, 78)))
-        path = "m 0 0 l %.1f 0 l %.1f %.1f l 0 %.1f z" % (w, w, th, th)
+        n = int(item.get("n", 1))
+        gap = float(item.get("gap", 40))
+        vert = bool(item.get("vert"))
+        segs = []
+        for k in range(n):
+            if vert:   # 竖线：一行一条，向右排
+                x0 = k * gap
+                segs.append("m %.1f 0 l %.1f 0 l %.1f %.1f l %.1f %.1f z"
+                            % (x0, x0 + th, x0 + th, w, x0, w))
+            else:      # 横线：向下排
+                y0 = k * gap
+                segs.append("m 0 %.1f l %.1f %.1f l %.1f %.1f l 0 %.1f z"
+                            % (y0, w, y0, w, y0 + th, y0 + th))
+        path = " ".join(segs)
+        # 竖线：宽度是 th、长度是 w；横线反着来
+        span = (n - 1) * gap + th if vert else (n - 1) * gap + th
+        px = float(item.get("x", 960)) - (th / 2.0 if vert else w / 2.0)
+        py = float(item.get("y", 900)) - (0 if vert else span / 2.0)
         ov = (r"{\an7\pos(%.1f,%.1f)\p1\bord0\shad0\1c%s\3c%s\fad(420,320)}"
-              % (float(item.get("x", 960)) - w / 2.0,
-                 float(item.get("y", 900)) - th / 2.0, bgr(col), bgr(col)))
+              % (px, py, bgr(col), bgr(col)))
         out.append("Dialogue: 2,%s,%s,Shape,,0,0,0,,%s%s{\p0}"
                    % (ts(float(item["start"])), ts(float(item.get("hold_end", item["end"]))),
                       ov, path))
@@ -228,10 +265,13 @@ def emit(out, item, grid):
         cy0 = float(item.get("y", 806))
         # \an7 + 从 0,0 起画；\org 把旋转中心挪到纸牌中心
         ov = (r"{\an7\pos(%.1f,%.1f)\org(%.1f,%.1f)\frz%.2f\p1\bord3\shad7"
-              r"\1c%s\3c%s\4c&H8C7A5E&\fad(420,340)}"
+              r"\1c%s\3c%s\4c%s\fad(420,340)}"
               % (cx0 - w / 2, cy0 - h / 2, cx0, cy0, rot,
-                 bgr(fill), bgr(edge)))
-        path = "m 0 0 l %.1f 0 l %.1f %.1f l 0 %.1f z" % (w, w, h, h)
+                 bgr(fill), bgr(edge), bgr((124, 102, 82))))
+        if item.get("torn"):
+            path = torn_rect(w, h, int(item.get("seed", 7)), float(item.get("jag", 5)))
+        else:
+            path = "m 0 0 l %.1f 0 l %.1f %.1f l 0 %.1f z" % (w, w, h, h)
         out.append("Dialogue: 1,%s,%s,Shape,,0,0,0,,%s%s{\p0}"
                    % (ts(float(item["start"])), ts(float(item.get("hold_end", item["end"]))),
                       ov, path))
