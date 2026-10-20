@@ -16,8 +16,25 @@ A skill for turning a song into an animated music video: style recommendation fr
 | 测拍点 | `scripts/beat_sync.py` | `beats.json`：BPM、相位 offset、1/8 拍网格 |
 | 拆曲式报成本 | `scripts/song_structure.py` | 段落强度、建议单镜时长、**总镜数与预估 credits** |
 | 卡拍点剪时间线 | `scripts/make_timeline.py` | xfade 脚本，切点自动吸附拍点，叠化中点压拍 |
-| 逐字弹字幕 | `scripts/make_subs.py` | ASS 字幕，一字一纸片、独立旋转、超 12 字自动均分 |
+| 逐字弹字幕 | `scripts/make_subs.py` | ASS 字幕，**逐句独立定位与字号**，一字一纸片、超 12 字自动均分 |
 | 出片 | 见 `references/ffmpeg-recipes.md` | delogo 去角标 + 调色 + 烧字幕 + loudnorm |
+
+## 字幕是逐镜排的，不是固定一行
+
+这是本 skill 和"自动生成字幕"最大的区别：**每句歌词的位置和字号都不一样**。
+
+同一个片子里，人物可能站在画面中间、躺在画面底部、或者整幅都是人群，
+一条固定高度的字幕必然会压到某几句的主体。所以流程是：
+出完 `base.mp4` → 按每句中点抽帧 → 在帧上找空档 → 逐句写 `x`/`y`/`fs`。
+
+```json
+{"start":68.0,"end":73.0,"text":"躺在你学校的操场看星空","x":1250,"y":565,"fs":56}
+{"start":100.0,"end":105.0,"text":"有人默默的陪在你的身边","x":960,"y":1015,"fs":64}
+```
+
+装不下就降字号（84→76→72→68→64→56→52），横穿构图重心（钟楼、大门、对称特写）时
+拆成左右两段。完整方法、字号对照表、落点选择与验收清单见
+[`references/subtitle-layout.md`](references/subtitle-layout.md)。
 
 ## 8 套内置风格
 
@@ -65,8 +82,8 @@ python scripts/make_subs.py --lines out/lines.json --beats out/beats.json \
 ```
 
 完整的十步流水线、参数速查、验收清单写在 [`SKILL.md`](SKILL.md)；
-16 条踩坑记录（并行出图撞名、ASS 颜色是 BGR 倒序、fontsdir 必须绝对路径转义盘符、
-字幕首字吸附偏向后方会累积成慢半拍……）见 [`references/pitfalls.md`](references/pitfalls.md)。
+18 条踩坑记录（并行出图撞名、ASS 颜色是 BGR 倒序、fontsdir 必须绝对路径转义盘符、
+字幕首字吸附偏向后方会累积成慢半拍、`-ss` 放 `-i` 前会让字幕静默不画……）见 [`references/pitfalls.md`](references/pitfalls.md)。
 
 ## 成本参考
 
@@ -78,7 +95,7 @@ python scripts/make_subs.py --lines out/lines.json --beats out/beats.json \
 ```
 SKILL.md                  十步主流程 + 参数速查 + 验收清单
 scripts/                  风格推荐 / 测拍 / 拆曲式 / 时间线 / 字幕
-references/               风格库、ffmpeg 配方、踩坑记录
+references/               风格库、字幕布局、ffmpeg 配方、踩坑记录
 assets/                   示例 json、字幕字体
 ```
 

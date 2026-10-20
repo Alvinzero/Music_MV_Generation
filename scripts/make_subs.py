@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""生成"一字一纸片、逐字蹦出、卡在拍上"的 ASS 字幕。
+"""逐句可定位的纸片字幕生成器。
+
+核心：字幕位置不是"顶/中/底"三档，而是**每句一个中心点 + 一个字号**。
+      排布方法见 references/subtitle-layout.md。
+
+  · 每句可给 "x" / "y" / "fs"，按该镜头的实际空档摆位
+  · 纸边(pad)、字缝(gap) 随字号等比缩放，缩字号时不会出现"大框小字"
+  · 越界自动回拉，保证整行不出画
+  · 超 12 字自动均分成前后两段，避免一行顶满画面
+
+lines.json 每项：
+  {"start":15.0,"end":18.0,"text":"你住的巷子里","x":800,"y":1005,"fs":80}
+  x/y 为整行的中心点；省略则退回 place(T/M/B) 与默认字号。
 
 用法:
-    python make_subs.py --lines lines.json --beats beats.json --out subs.ass \
-        [--font "ZCOOL KuaiLe"]
-
-lines.json（每句一条）:
-    [
-      {"start":1.83,"end":4.30,"text":"我们都是渺小真实存在","place":"M"},
-      {"start":8.35,"end":10.60,"text":"直到遇见你我以为就光明起来","place":"B"},
-      {"start":54.0,"end":56.0,"text":"把回忆拼好给你","title":true}
-    ]
-    place: T 顶部 / M 中部 / B 底部；title 为整块浮现的片尾标题
-
-要点（都已在实现里）:
-  · 颜色按 ASS 的 &HAABBGGRR 写（BGR 倒序）；\\1c \\3c \\4c 用 &HBBGGRR&
-  · 每个字独立事件、独立 \\pos、独立 \\frz，纸片 = BorderStyle=3 底框
-  · 字的出现时刻吸附到 1/8 拍网格；每句首字就近吸附（不偏向后方）
-  · 超过 CHUNK_MAX 字自动均分成前后两段轮流显示
+  python make_subs.py --lines out/lines.json --beats out/beats.json \
+      --font "ZCOOL KuaiLe" --out out/subs.ass
 """
 
 import argparse
@@ -27,30 +25,32 @@ import os
 
 import numpy as np
 
-# ---- 版式（手机可读为基准，可按画面调整）----
-FS, PAD, GAP, ROW_Y = 84, 22, 12, 1000     # 正文：字号 / 纸边留白 / 片间缝 / 底部行中心
-TOP_Y, MID_Y = 96, 420                      # 顶部 / 中部行中心
-TFS, TPAD, TGAP, TROW_Y = 120, 26, 16, 878  # 片尾标题
-CHUNK_MAX = 12                              # 每段最多几个字
-MIN_STEP = 0.15                             # 每字最短间隔，防密集句过快
+# ---- 版式 ----
+FS, ROW_Y = 84, 1000
+TOP_Y, MID_Y = 96, 420
+TFS, TROW_Y = 120, 878
+CHUNK_MAX = 12
+MIN_STEP = 0.15
+SAFE_X = 30          # 左右安全边
 TILT = [-3.2, 2.1, -1.4, 3.6, -2.4, 1.2, -0.8, 2.9, -3.8, 1.8, -1.9, 3.1]
 
-# 每句一套 (纸片色, 字色, 纸边)，按情绪推进；不够则循环
+# 每句一套 (投影色, 字色, 纸面色)，纸雕色盘
 PALETTE = [
-    ((241, 234, 217), (56, 48, 38), (214, 199, 176)),
-    ((231, 219, 224), (92, 52, 72), (199, 184, 190)),
-    ((247, 234, 216), (122, 74, 32), (212, 192, 165)),
-    ((223, 236, 240), (29, 82, 102), (177, 201, 211)),
-    ((250, 228, 220), (142, 63, 50), (217, 187, 177)),
-    ((212, 216, 221), (36, 38, 44), (174, 179, 186)),
-    ((230, 239, 228), (42, 90, 66), (186, 201, 182)),
-    ((248, 238, 208), (124, 97, 18), (214, 199, 162)),
-    ((237, 227, 241), (86, 50, 126), (197, 183, 205)),
-    ((249, 224, 233), (142, 42, 92), (214, 181, 194)),
-    ((227, 234, 239), (53, 80, 107), (183, 195, 203)),
-    ((247, 226, 219), (142, 48, 37), (214, 183, 175)),
-    ((243, 232, 205), (97, 72, 30), (210, 196, 163)),
+    ((226, 216, 198), (56, 48, 38), (246, 240, 228)),
+    ((196, 183, 164), (36, 48, 70), (232, 224, 208)),
+    ((186, 199, 220), (26, 48, 96), (224, 234, 248)),
+    ((214, 186, 158), (92, 56, 28), (238, 220, 198)),
+    ((176, 190, 232), (30, 50, 140), (226, 234, 252)),
+    ((206, 206, 202), (40, 44, 52), (238, 238, 234)),
 ]
+TITLE_IDX = 5
+
+
+def metrics(fs):
+    """按字号推出纸边与字缝，保持视觉比例。"""
+    pad = max(9, int(round(fs * 0.26 / 2) * 2))
+    gap = max(6, int(round(fs * 0.13)))
+    return fs, pad, gap, fs + 2 * pad
 
 
 def bgr(rgb):
@@ -67,8 +67,13 @@ def ts(t):
     return "%d:%02d:%05.2f" % (int(t // 3600), int(t % 3600 // 60), t % 60)
 
 
-def head(font):
+def head(font, sizes):
     fill, ink, edge = PALETTE[0]
+    dyn = []
+    for fs in sizes:
+        pad = metrics(fs)[1]
+        dyn.append("Style: T%d,%s,%d,%s,%s,%s,%s,-1,0,0,0,100,100,1.8,0,3,%d,0,5,0,0,0,1"
+                   % (fs, font, fs, bgr_a(ink), bgr_a(ink), bgr_a(edge), bgr_a(fill), pad))
     return """[Script Info]
 ScriptType: v4.00+
 PlayResX: 1920
@@ -78,14 +83,14 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Tile,{font},{fs},{ink},{ink},{edge},{fill},-1,0,0,0,100,100,1.8,0,3,{pad},0,5,0,0,0,1
+{styles}
 Style: BigTile,{font},{tfs},{tink},{tink},{tedge},{tfill},-1,0,0,0,100,100,3.5,0,3,{tpad},0,5,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-""".format(font=font, fs=FS, pad=PAD, tfs=TFS, tpad=TPAD,
-           ink=bgr_a(ink), edge=bgr_a(edge), fill=bgr_a(fill),
-           tink=bgr_a(PALETTE[12][1]), tedge=bgr_a(PALETTE[12][2]), tfill=bgr_a(PALETTE[12][0]))
+""".format(font=font, styles="\n".join(dyn), tfs=TFS, tpad=metrics(TFS)[1],
+           tink=bgr_a(PALETTE[TITLE_IDX][1]), tedge=bgr_a(PALETTE[TITLE_IDX][2]),
+           tfill=bgr_a(PALETTE[TITLE_IDX][0]))
 
 
 class BeatGrid:
@@ -104,7 +109,6 @@ class BeatGrid:
         return self.off + round((t - self.off) / self.base) * self.base
 
     def plan(self, start, end, n):
-        """把 n 个字排到网格上：步长取网格整数或半整数倍，首字就近吸附。"""
         if not self.ok:
             step = (end - start) / n
             return [start + i * step for i in range(n)]
@@ -124,7 +128,6 @@ class BeatGrid:
             best_m = max(0.5, np.ceil(MIN_STEP / base * 2) / 2)
         step = best_m * base
 
-        # 首字：在 [start-0.20, start+0.10] 里取最近网格点（正拍仅在 ±0.06 内才用）
         lo, hi = start - 0.20, start + 0.10
         k_lo = int(np.ceil((lo - self.off) / base))
         k_hi = int(np.floor((hi - self.off) / base))
@@ -145,13 +148,19 @@ def emit(out, item, grid, idx):
         return
     start, end = float(item["start"]), float(item["end"])
     title = bool(item.get("title"))
+
+    fs = int(item.get("fs", TFS if title else FS))
+    fs, pad, gap, tile = metrics(fs)
+
+    # 位置：显式 x/y 优先，否则退回 place
     place = item.get("place", "B")
-    fs, pad, gap, y = (TFS, TPAD, TGAP, TROW_Y) if title else (FS, PAD, GAP, ROW_Y)
-    if place == "T" and not title:
-        y = TOP_Y
-    elif place == "M" and not title:
-        y = MID_Y
-    tile = fs + 2 * pad
+    cy = float(item.get("y", TROW_Y if title else ROW_Y))
+    if "y" not in item:
+        if place == "T":
+            cy = TOP_Y
+        elif place == "M":
+            cy = MID_Y
+    cx = float(item.get("x", 960))
 
     times = [start] * len(text) if title else grid.plan(start, end, len(text))
     hold = 0.0 if title else 0.30
@@ -169,10 +178,12 @@ def emit(out, item, grid, idx):
             pos += size
 
     i = 0
-    for ci, chunk in enumerate(chunks):
+    for chunk in chunks:
         m = len(chunk)
         total = m * tile + (m - 1) * gap
-        x0 = (1920 - total) / 2 + tile / 2
+        # 越界回拉
+        cx_use = min(max(cx, SAFE_X + total / 2), 1920 - SAFE_X - total / 2)
+        x0 = cx_use - total / 2 + tile / 2
         if i + m < n:
             seg_end = times[i + m] + 0.10
         else:
@@ -190,11 +201,11 @@ def emit(out, item, grid, idx):
                 anim = ("\\fscx50\\fscy50\\t(0,80,\\fscx118\\fscy118)"
                         "\\t(80,170,\\fscx100\\fscy100)\\fad(55,%d)" % out_ms)
             head_txt = ("{\\an5\\pos(%.1f,%.1f)\\frz%.2f%s\\1c%s\\2c&HFF000000&\\3c%s\\4c%s}"
-                        % (x, y, rot, anim, bgr(PALETTE[idx][1]),
+                        % (x, cy, rot, anim, bgr(PALETTE[idx][1]),
                            bgr(PALETTE[idx][2]), bgr(PALETTE[idx][0])))
             out.append("Dialogue: 0,%s,%s,%s,,0,0,0,,%s%s"
                        % (ts(t_on), ts(t_end),
-                          "BigTile" if title else "Tile", head_txt, ch))
+                          "BigTile" if title else "T%d" % fs, head_txt, ch))
         i += m
 
 
@@ -210,13 +221,23 @@ def main():
         items = json.load(f)
     grid = BeatGrid(a.beats)
 
-    lines = [head(a.font)]
-    allt = []
+    sizes = sorted({int(it.get("fs", TFS if it.get("title") else FS)) for it in items
+                    if not it.get("title")})
+    lines = [head(a.font, sizes)]
+    allt, wide = [], []
     for idx, it in enumerate(items):
         emit(lines, it, grid, idx % len(PALETTE))
         txt = "".join(c for c in it["text"] if c.strip())
         if not it.get("title"):
             allt += grid.plan(float(it["start"]), float(it["end"]), len(txt))
+            fs = int(it.get("fs", FS))
+            _, pad, gap, tile = metrics(fs)
+            n = len(txt)
+            chunks = 1 if n <= CHUNK_MAX else -(-n // CHUNK_MAX)
+            per = -(-n // chunks)
+            w = per * tile + (per - 1) * gap
+            if w > 1860:
+                wide.append((it["text"][:8], w))
 
     with open(a.out, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
@@ -226,6 +247,7 @@ def main():
         errs = [abs(t - grid.snap(t)) for t in allt]
         print("网格 %.4fs 偏移 %.3fs 最大偏离 %.4fs"
               % (grid.base, grid.off, max(errs) if errs else 0))
+    print("超宽行:", wide or "无")
 
 
 if __name__ == "__main__":
