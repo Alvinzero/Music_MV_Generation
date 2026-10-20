@@ -158,6 +158,8 @@ python scripts/make_subs.py --lines out/lines.json --beats out/beats.json \
 - `emph` = `{字下标: 放大倍数}`，一句里允许字号不统一，用来做重音
 - `tints` = **逐字换色**：`[{"from":4,"to":6,"paper":[238,214,170],"ink":[96,66,34]}]`
   唱到"灯亮"就让那两个字变暖光——词义驱动的最低成本做法，见 layout 第七节
+- 片头是**独立版式**，不是字幕卡堆两排：`kind:"plate"`（整块纸底）+ `kind:"plain"`
+  （无底文字，配 `ls` 拉开字距）+ `kind:"rule"`（细线分层级），见 layout 第七节
 - `move` = **给字一条轨迹**：`{"d0":[0,0],"d1":[186,30],"frz0":-2,"frz1":16,"dur":1400,
   "t0":250.15,"fade":[80,520],"scale":0.44}`，配 `move_i:[12,13]` 只让这几个字动
 - `carrier` = **让字本身变成物件**：目前内置 `balloon`（椭圆球体+气嘴+细绳），
