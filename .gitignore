@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.DS_Store
+# 本地产物
+out/
+images/
+clips/
+cover/
+generated-images/
+generated-videos/
+*.mp4
+*.mp3
+*.wav
+*.m4a
