@@ -430,6 +430,54 @@ ffmpeg -i title.mp4 -i base.mp4 -filter_complex \
 
 音画不重新对轴，整首歌时间线原封不动。
 
+### 本次实测参数（可直接抄）
+
+这是那条通过验收的片头的完整参数，换片子时按比例改 x/y 即可。
+
+**生成场景用的 prompt（照抄，只换场景词）**
+
+```
+Cinematic plate shot with NO TEXT AT ALL. Handcrafted paper-craft stop-motion
+diorama of a narrow miniature alley at golden hour ... A completely BLANK cream
+paper banner with torn edges is strung across the alley between two buildings,
+swaying very gently. The banner surface is empty, clean, with only subtle paper
+fibre texture ... Absolutely no text, no letters, no characters, no writing
+anywhere in the frame.
+
+negative: text, letters, characters, writing, words, typography, logo, watermark,
+Chinese characters, signs, labels, garbled marks, traditional Chinese
+```
+
+关键：**标题里就要写 "NO TEXT AT ALL"**，再在句末重复一遍 "absolutely no text"，
+negative 里把 text / letters / Chinese characters 都挂上。少一处它就会自己添字。
+
+**排字用的 ASS**
+
+```
+Style: T,MV Serif SC,92,&H001A1E26,...,1,0,0,5,...
+Style: S,MV Serif SC,30,&H00242C34,...,1,0,0,5,...
+
+Dialogue: 0,0:00:00.00,0:00:10.00,T,,0,0,0,,{\an5\pos(918,316)\frz-1.5\fsp10}等你下课
+Dialogue: 0,0:00:00.00,0:00:10.00,S,,0,0,0,,{\an5\pos(918,420)\frz-1.5\fsp5}周杰伦 / 杨瑞代
+```
+
+- 标题 **92 号、字距 10、倾斜 −1.5°**，跟横幅自身的角度对齐
+- 署名 **30 号、字距 5**，字号是标题的 1/3，同角度
+- 字色 `#261E1A`（暖墨），比纯黑柔，压在米色纸横幅上不刺眼
+- 只放两行：**歌名 + 歌手**。第三行开始模型不需要负责，但也别指望它排得下
+
+**推镜**
+
+```
+scale=2880:1620,
+zoompan=z='min(1.26+0.00035*on,1.34)':d=144:
+        x='max(0,1377-(iw/zoom)/2)':y='max(0,537-(ih/zoom)/2)':
+        s=1920x1080:fps=24
+```
+
+`1377 / 537` 是横幅中心在 **2880×1620** 坐标系里的位置（即原图 918/358 的 1.5 倍）。
+换片子时按 `横幅中心 × 1.5` 算，推镜就会一直锁着横幅。
+
 ### 一句话记住
 
 **场景交给模型，文字交给字库，运动交给 ffmpeg。** 三段各干一件事，
