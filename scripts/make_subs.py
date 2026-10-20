@@ -142,6 +142,13 @@ def emit(out, item, grid):
         cy = {"T": 96, "M": 420}.get(item.get("place", "B"), 1000)
     accent = -1 if is_title else int(item.get("accent", 0))
     scene = item.get("mode") == "scene"
+    tints = item.get("tints") or []
+
+    def tint_of(i):
+        for t in tints:
+            if t.get("from", 0) <= i <= t.get("to", 10 ** 6):
+                return t
+        return None
     emph = {int(k): float(v) for k, v in (item.get("emph") or {}).items()}
 
     # 题字整块快速浮出，不跟着唱词慢慢铺
@@ -149,7 +156,8 @@ def emit(out, item, grid):
              if is_title else grid.plan(start, end, len(text)))
 
     n = len(text)
-    if n <= CHUNK_MAX:
+    # 场景联动整句一行铺开，不拆段——大字一拆就会跳位
+    if scene or n <= CHUNK_MAX:
         chunks = [(0, text)]
     else:
         k = -(-n // CHUNK_MAX)
@@ -190,7 +198,11 @@ def emit(out, item, grid):
                 style = "S%d" % fs
                 anim = "\\fad(90,160)"
             else:
-                edge, ink = (CORAL, CORAL_INK) if is_accent else (PAPER, INK)
+                t = tint_of(idx)
+                if t:
+                    edge, ink = tuple(t.get("paper", PAPER)), tuple(t.get("ink", INK))
+                else:
+                    edge, ink = (CORAL, CORAL_INK) if is_accent else (PAPER, INK)
                 style = "C%d" % fs
                 anim = "\\fscx88\\fscy88\\t(0,80,\\fscx100\\fscy100)\\fad(36,120)"
             out.append("Dialogue: 0,%s,%s,%s,,0,0,0,,"
