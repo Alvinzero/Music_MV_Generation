@@ -372,55 +372,68 @@ ffmpeg -y -i f24.png -vf "crop=560:110:280:585,scale=1680:330" z.png
 > 换一首歌就换一个载体：写校园的用作业本，写旅途的用票根，写告白的用信纸。
 > 不要所有歌都用同一块纸牌。
 
-### 片头标题：用 VideoGen 生成，别后期叠
+### 片头标题：AI 出场景，字库出文字
 
-**后期把字幕叠到生成画面上，是必败的**：纸页在动、镜头在推，叠上去的字却是死的，
-一眼就露馅。所以片头标题要**连画面一起生成，信息烧进视频里**。
+**先说结论：不要让视频模型写中文。** 实测五次，没有一次能全对：
 
-关键技巧：**别让模型写中文**。模型渲染汉字几乎必糊。正确做法是分两步：
+| 第几版 | 结果 | 错在哪 |
+|---|---|---|
+| 1 | 标题对，署名全糊 | 三行小字变成乱码 |
+| 2 | 标题对，署名乱码 | "梁奕奕""何奕奕"之类的臆造字 |
+| 3 | 标题对，歌手行对 | 但用的是**繁体**（課、楊） |
+| 4 | 加了简体约束 | "伦"被写成"论"（形近字串了） |
+| 5 | 改成大白话 | 仍会在小字上崩 |
 
-**第一步，自己合成首帧**（用 ASS / ffmpeg，文字 100% 正确）：
+规律很稳定：
+
+- **字越大越准，字越小越糊**。90px 的标题基本对，30px 的署名胜率极低
+- **繁简混用**是高频故障。训练语料里中文标题偏书法、偏繁体，模型默认走繁体
+- **形近字会串**。伦/论、课/棵、末/未，差几个笔画就随机给一个
+- **提示词管不住**。写"简体中文""不要繁体"，模型只当成风格倾向，不当执行规则
+
+原因很简单：模型不是在"排版"，是在"画像素"。它没有字形表、没有字库，
+每一笔都是猜出来的。中文一个字十几笔，小字直接超出它的分辨率。
+
+### 可靠的做法：三段式
+
+**① AI 生场景，画面里不要字**
+
+```
+prompt: ... A completely BLANK cream paper banner with torn edges is strung across
+the alley ... Absolutely no text, no letters, no characters anywhere.
+negative: text, letters, characters, writing, Chinese characters, signs
+```
+
+拿到一条 6 秒的干净场景片（纸雕巷子、晾衣绳、白鸽飞过、镜头微推）。
+
+**② 字库排字，排在场景里的载体上**
+
+从场景片里挑一帧当底，用 ASS 把标题排上去（`\an5\pos(x,y)\frz` 对齐横幅角度，
+`\fsp` 拉开字距）。这一刻文字是**零错**的，因为它来自字库，不是来自模型。
+
+**③ 推镜在后期做，让画面和字同源**
 
 ```bash
-# 拿影片自己的某一帧当底，把标题页叠上去
-ffmpeg -y -copyts -ss 3.4 -i base.mp4 \
-  -vf "ass=subs.ass:fontsdir=..." -frames:v 1 title_frame.png
+ffmpeg -i still.png -vf "scale=2880:1620,\
+ zoompan=z='min(1.26+0.00035*on,1.34)':d=144:s=1920x1080:fps=24" -t 6 title.mp4
 ```
 
-**第二步，交给 VideoGen 图生视频**，只让它做运动：
+文字和背景是**同一张图**，推镜时完全同步，不存在"字不跟着纸走"的问题。
 
-- `image` = 上一步的 PNG；`last_image` 也传同一张 → 末帧回到首帧，抑制漂移
-- `seconds` 6，`resolution` 1080P，`enable_audio` false（音轨在后面统一接）
-- prompt 里必须写死："hanging paper page and every character of the writing on it
-  must stay perfectly sharp, stable and completely unchanged for the entire shot"
-- `negative_prompt` 必写：warped text, distorted characters, extra text, changing
-  letters, melting letters, moving or rotating the paper, rippling paper
-- 运动幅度要小。微风摆动 + 极缓推进就够，幅度一大字必变形
-
-**第三步，拼接时只换画面，不动音轨**：
+**④ 拼到片头，只换画面不动音轨**
 
 ```bash
-ffmpeg -i gen.mp4 -i base.mp4 -filter_complex \
-"[0:v]trim=0:5.8,setpts=PTS-STARTPTS[vt];\
- [1:v]trim=5.8:270,setpts=PTS-STARTPTS[vb];\
- [vt][vb]concat=n=2:v=1:a=0[v]" -map "[v]" base2.mp4
+ffmpeg -i title.mp4 -i base.mp4 -filter_complex \
+"[0:v]trim=0:6,setpts=PTS-STARTPTS[vt];\
+ [1:v]trim=6:270,setpts=PTS-STARTPTS[vb];[vt][vb]concat=n=2:v=1:a=0[v]" -map "[v]" base4.mp4
 ```
 
-这样音画不会重新对轴，也不用重排整首歌。代价只是原片最前面几秒的画面被替换——
-那本来就是前奏没有人声的地方。
+音画不重新对轴，整首歌时间线原封不动。
 
-**第四步，把标题从 lines.json 里删掉**。信息已经在画面里了，
-再叠一遍就是双重标题。`build_lines` 里留个开关：
+### 一句话记住
 
-```python
-TITLE_BAKED = True        # 标题已生成进画面，这里就不再叠字幕
-if not TITLE_BAKED:
-    items.insert(0, dict(...))
-```
-
-**关于角标**：生成片带平台水印（"AI生成"），位置通常和原片水印一样，
-会被同一条 `delogo` 一起抹掉。是否保留由你决定——要留就把它排除在 delogo 区域外，
-或对该段单独处理。
+**场景交给模型，文字交给字库，运动交给 ffmpeg。** 三段各干一件事，
+只要有一环越界（让模型写字、让后期叠字），就会出问题。
 
 ### 三个可直接套用的取色
 
