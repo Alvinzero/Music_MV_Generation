@@ -78,7 +78,9 @@ python scripts/align_subs.py --audio song.m4a --lines out/lines.json \
 
 ### 4. 片头与封面：字必须长在画面里
 
-- **片头**：歌名不是字幕层。ImageGen 出无字载体 → `make_title.py` 字库排字 → 图生视频。
+- **片头**：歌名不是字幕层。先出**场景**（不是一块广告牌），再版式排版——
+  A 压字型（场景满幅、字压中部）或 B 纸带型（底部纸带承字），眉标/主标/细线/出处四件套。
+  生成后必须过 `check_title.py`：水印、时长、留白、占宽、居中，不合格一律重做。
   脚本强制上下各留 6.5%，手写按高度算满会把首字顶到纸边。
 - **封面**：文字站中间、有载体。标题优先让 ImageGen 直出（逐字核对），核对不过才退字库合成。
 
@@ -101,10 +103,10 @@ references/
   05b-subtitle-recipes.md 12 套字幕配方的完整参数
   06-title-card.md        片头（载体选择、VideoGen 四个坑）
   07-cover.md             封面（直出核对清单、版式标准）
-  08-pitfalls.md          24 条实踩的坑
+  08-pitfalls.md          27 条实踩的坑
   09-style-library.md     31 套视觉风格
   10-remotion.md          可选后端
-scripts/                  24 个脚本（见下）
+scripts/                  26 个脚本（见下）
 assets/fonts/             MV Serif SC（衬线）、站酷快乐体
 assets/*.example.json     lines.json / beats.json 的字段示例
 ```
@@ -119,7 +121,8 @@ assets/*.example.json     lines.json / beats.json 的字段示例
 | `align_subs.py` / `align_core.py` | 统一对齐 + 逐字校对（0.3s 门槛） |
 | `make_subs.py` / `make_subs_glow.py` | 出 ASS（有载体 / 无载体，后者支持 `--recipe`） |
 | `subtitle_router.py` | 12 套字幕配方打分 |
-| `make_title.py` / `make_cover.py` | 片头排字、封面合成 |
+| `make_title.py` / `make_cover.py` | 片头排字（压字/纸带两种版式）、封面合成 |
+| `check_title.py` / `crop_watermark.py` | 片头验收（水印/时长/留白/居中）、一键裁水印并复测 |
 | `timeline.py` / `render_ffmpeg.py` / `quality_check.py` | 时间轴、渲染、质检 |
 
 ---

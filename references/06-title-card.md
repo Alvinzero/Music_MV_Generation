@@ -31,19 +31,61 @@
 
 ---
 
-## 二、先选载体：字写在什么上面
+## 二、先选版式：字怎么和场景待在一起
 
-载体必须**有出处**——它得是这个世界里本来就会存在的纸：
+### 先说清楚：为什么"一块纸 + 大字"会显得单调
 
-| 载体 | 适合的歌 | 为什么成立 |
+最常见的翻车：把纸幡当主体，让它占画面 60–85%，于是**场景被挤没了**，画面只剩一张纸。
+再配上"标题 + 署名"两级排版，就成了一张 PPT。
+
+真正高级的片头（报刊封面那种质感）有三个共同点：
+
+1. **场景是主角**，字只是压在场景上的一层——观众先看到"一个地方"，再意识到上面有字
+2. **有编辑层次**：眉标、主标、细线、出处，四件套撑起"这是一张出版物"的感觉
+3. **字是印上去的**：纸纹调制、柔影、微模糊，不是浮在画面上的矢量字
+
+### 两种版式，二选一
+
+| | **A 压字型** | **B 纸带型** |
 |---|---|---|
-| 街口竖挂的纸幡 / 招牌 | 城市、孤独、被忽视 | 一个没人抬头看的名牌 |
-| 作业本 / 试卷 | 校园、暗恋 | 名字写在封面上 |
-| 车票 / 票根 | 离别、远行 | 目的地和日期都写在纸上 |
-| 信封 / 信纸 | 思念、旧事 | 收信人就是歌名 |
-| 便签 / 备忘录 | 日常、自述 | 随手写下的一句话 |
+| 长相 | 场景满幅，字直接压在画面中部 | 场景占上部 72–78%，底部纸带承字 |
+| 参考 | 《手写的从前》 | 《大梦归》 |
+| 适合 | 画面本身有留白/暗部 | 画面很满、没有安静区域 |
+| 字色 | 暗底用暖米 `#F2E2C4`，亮底用暖墨 `#2B2118` | 纸带上一律暖墨 |
+| 主标字号 | 画面宽的 **55–72%**（6 字约 170–190px） | 纸带高的 **55–65%** |
+| 场景占比 | 100%（字压在场景上） | 72–78% |
+| 风险 | 背景太花会读不清 | 纸带颜色跳戏 |
 
-**不要**用一块干净的空白纸板。它没有出处，谁都能用，等于没有设计。
+**判据**：底图的中部（画面 35–65% 高度）有没有一块"安静"的区域？
+有 → A；没有 → B。
+
+#### A 压字型的排版参数
+
+```
+主标   字距 0.06em，居中，中心落在 46–52% 画面高
+眉标   歌手名，0.23×主标字号，主标上方 0.16H，字距 0.12em
+细线   主标上方再 0.02H，宽 150–300px，1.5px，暖墨 40% 透明
+柔影   blur 8–10px，下偏移 3px，强度 0.55–0.75（暗底要更重）
+字色   暗底 #F2E2C4 / 亮底 #2B2118，都不用纯黑纯白
+```
+
+#### B 纸带型的排版参数
+
+```
+纸带   高 22–26%，色取画面同族纸色（暖米 #F0E7D4 一类），上沿一道 8px 软影
+主标   居中，中心落在纸带 40–45% 处
+细线   主标下方 0.30×纸带高，宽 300px，砖红或暖墨 55%
+出处   细线下 0.10×纸带高，0.23×主标字号，「歌手 · 《歌名》主题曲」
+```
+
+### 载体还要不要
+
+要，但**不再当主体**。载体退成两种用法：
+
+- 贴在场景里的**一块小牌子/一张纸**，占画面 15–25%（当画眼，不当背景）
+- 或者干脆不用载体，字直接压在场景上（A 型）
+
+**判断标准**：把字全去掉，画面还成不成立？成立才说明场景在，而不是"为了放字而搭的台子"。
 
 ### 署名放哪里：歌名居中，但署名可以拆出去
 
@@ -107,23 +149,41 @@ ffmpeg -y -i out/title_v2.mp4 -i out/base.mp4 -filter_complex \
 
 ## 三、三段式：出无字场景 → 排字 → 让它动
 
-### ① ImageGen 出一张**完全没有字**的载体场景
+### ① ImageGen 出**场景**（不是"一块广告牌"）
+
+**别再写 `a blank signboard filling 60% of the frame width`** —— 这句话就是在生成"一张纸"，
+生成出来必然单调。要写的是**一个有故事的空间**，并给它留出安静区。
+
+#### A 压字型的提示词
 
 ```
-macro photograph of a handcrafted paper-cut diorama at night, symmetric frontal
-composition, MEDIUM CLOSE-UP: one blank rectangular signboard of cream torn paper
-hanging from a slim paper bracket, centred in frame and filling about 60 percent
-of the frame width, its face parallel to the camera and perfectly flat, glowing
-warm amber from a hidden light behind it, <环境>,
-absolutely no text, no letters, no characters, no writing, no signage, no logo
+cinematic wide shot of <场景：一条纸做的夜巷 / 一片纸山 / 一间亮着灯的屋子>,
+handcrafted paper-cut diorama, tilt-shift macro photography, deep indigo night,
+warm amber window lights, dust motes in the air, shallow depth of field,
+the middle band of the frame (35–65% height) left VISUALLY CALM and uncluttered
+so a title can sit on it, subject placed off-centre,
+absolutely no text, no letters, no characters, no signage, no logo, no watermark
 ```
 
-三个必写：`centred in frame`、`parallel to the camera and perfectly flat`（要平，才能排字）、
-`absolutely no text`（正向写完反向再写一遍）。
+#### B 纸带型的提示词
 
-> **载体必须生成在画面正中。** 偏左或偏右的载体，后面只有两个选择：把字跟着排偏（违反"文字站中间"），
-> 或者裁一刀把载体挪回中间（损失构图）。第一步就让它在中间，后面全省事——
-> 跑 `--vertical` 时脚本会打印"字块中心 vs 画面中线"，偏了就是载体没居中，回去重出图。
+```
+cinematic wide shot of <场景>, handcrafted paper-cut diorama,
+the scene occupies the UPPER THREE QUARTERS of the frame, rich in detail,
+the BOTTOM QUARTER is a plain sheet of cream handmade paper with visible fibre
+texture, completely empty and clean, reserved for a title,
+deep indigo night, warm amber lights, dust motes,
+absolutely no text, no letters, no characters, no signage, no logo, no watermark
+```
+
+#### 三条必写
+
+1. **`VISUALLY CALM / empty` 指明哪一块留给字** —— 不写它就会把整个画面塞满
+2. **`subject placed off-centre`（A 型）** —— 主体居中会和标题打架
+3. **`absolutely no text`** —— 正反向都写，否则模型自己加字
+
+> 出图后先别看字：**把图当成一张纯风景看，好不好看？**
+> 不好看就说明场景没搭起来，重出图，别急着排字。
 
 ### ② 用字库把字排进去（`scripts/make_title.py`）
 
@@ -133,6 +193,23 @@ absolutely no text, no letters, no characters, no writing, no signage, no logo
 > 封面是**一张静态海报**，只要字对、位置对就完事，模型直出还能让字跟着褶皱走；
 > 片头是**要动起来的 6 秒**，竖排 6 字 + 小署名 + 被推轨带着走，一旦模型丢了字或加了料，
 > 整段视频得重生成。片头走"字库排进首帧、模型只负责运动"，字就永远不会错。
+
+**A 压字型**（底图是一整幅场景，字直接压上去）：
+
+```bash
+python scripts/make_title.py --src images/title_scene.png     --title "无人知晓的我" --singer "A-Lin" --cy-title 545 --singer-y 350     --singer-size 40 --no-line --still out/title_still.png
+```
+
+`--cy-title` 是主标中心（画面 46–52% 高），`--singer-y` 是眉标的 y。
+这两项没有通用值，先出静帧看一眼再调。
+
+**B 纸带型**（底部纸带承字）：
+
+```bash
+python scripts/make_cover.py --src images/title_scene.png --title "无人知晓的我" \
+    --artist "A-Lin" --layout band --band 0.24 --title-width 0.58 \
+    --out out/title_still.png
+```
 
 **横排（横幅、信纸、车票）**
 
@@ -200,6 +277,15 @@ negative   : zoom in, push in, dolly in, camera movement, warped text,
 > **片头留 5–6 秒。** 六个竖排字 + 署名，少于 4 秒读不完；超过 7 秒观众会开始等。
 > 本次是 5.92 秒（142 帧），前 1.4 秒还在淡入，实际可读约 4.5 秒——刚好。
 
+**生成完立刻走这两步，不做就不许往下：**
+
+```bash
+python scripts/crop_watermark.py --src raw.mp4 --out clips/s01.mp4   # 裁水印 + 自动复测
+python scripts/check_title.py --clip clips/s01.mp4 --area 760,66,1160,622   # 六项全查
+```
+
+不通过就回 `③` 重新生成——**换提示词、换机位写法、换做法都行，就是不许带着缺陷往下走。**
+
 ### ④ 接回正片（这一步最容易漏）
 
 片头不是独立文件，它要占掉时间轴的第一段，**总帧数必须不变**：
@@ -239,15 +325,34 @@ negative 挂 `zoom in, push in, dolly in, camera movement, cropped banner, banne
 > 标题从 40% 缩到 25%。结论不是"哪个提示词更对"，而是——
 > **两版都要抽首尾帧核对**，不许只看第一帧。
 
-### 坑 2：VideoGen 的水印在**左上角**，和 ImageGen 不是一回事
+### 坑 2：水印位置**不固定**，不许套一个固定的 crop 值
 
-| 工具 | 水印位置 | 规避方式 |
+早期文档写死 `crop=1700:956:110:0`（裁掉左侧 110px），这是**错的做法**。实测：
+
+| 来源 | 水印 bbox（1920×1080） | 说明 |
 |---|---|---|
-| ImageGen | 右下角 | **16:9 底图**裁 `crop=1755:987:0:0`；**3:4 底图**裁 `crop=0,0,1024,1365` |
-| VideoGen | **左上角**（约 x<110, y<70） | 对称裁：`crop=1700:956:110:0` 再 scale 回 1920×1080 |
+| ImageGen 出图 | 右下角 | 3:4 底图裁 `0,0,1024,1365`；16:9 底图裁 `1755:987:0:0` |
+| VideoGen（本机） | 左上 **(10, 10)–(127, 63)** | 118×54，裁 110px **会剩 17px 尾巴** |
+| VideoGen（另一台机器） | 左上，但更靠右 | 直接套 110px 完全没裁掉——用户实测遇到过 |
 
-只裁左边会破坏构图，要左右对称裁；裁掉的 110px 里正好含水印。
-**两个工具的水印不在同一个角**，按老习惯裁另一边会留下半截字。
+**正确顺序：先测，再裁，再复测——一条命令做完：**
+
+```bash
+python scripts/crop_watermark.py --src raw.mp4 --out clips/s01.mp4
+#   水印 左上角 1.00 @ (10, 10, 127, 63)
+#   裁切 crop=1646:1007:137:73（左右各 137，上 73）→ 复测最高分 0.00
+#   [通过]
+```
+
+它会：①四角逐帧扫出 bbox ②按 bbox 对称裁（左右同宽，保持构图居中）③拉回原尺寸 ④**自动复测**，
+残留就返回 2。单独测某一项：
+
+```bash
+python scripts/check_title.py --clip clips/s01.mp4 --only watermark
+```
+
+**为什么必须复测**：裁完看起来"应该没了"，和实测"确实没了"是两件事。
+这个 skill 的片头就因为只做前一步，交付的片子里水印一直在。
 
 ### 坑 3：生成片段自己会越来越亮
 
@@ -293,21 +398,47 @@ eq=brightness='-0.056*min(t/5.9,1)':eval=frame
 
 ---
 
-## 六、交付前自检（7 条，全部要过）
+## 六、验收：跑脚本，不过就重做
 
-- [ ] **首字没有贴到载体边缘**：上方留白 ≥ **载体高的 6.5%**，末字/署名到载体底 ≥ 6.5%。
-      走 `make_title.py --vertical` 的由脚本强制守住；走 ImageGen 直出的**必须用眼睛量**
-- [ ] **标题占载体高 60–87%**。这个区间是"上下各留 6.5%"反推出来的：
-      低于 60% 说明字太小、整块发虚；超过 87% 说明载体太紧，回去把载体做高，
-      不要靠继续压字号
-- [ ] **文字在画面中间**：字块中心 = 载体中线（±8px）= 画面水平中线（±8% 画宽）。
-      偏到一侧就不是这个版式了，读起来像贴角标
-- [ ] **抽首帧和末帧**，确认全程没出画、没被裁、字没变形
-- [ ] **水印已裁掉**（ImageGen 在右下 / VideoGen 在左上，位置不同，裁法也不同）
-- [ ] **总帧数对得上**：片头占 `N` 帧，后续镜头起点 = `N/24`s，全片总帧不变
-- [ ] **缩到 375px 宽**还能读；片头信息在手机上一眼认不出来，等于没做
+**片头不允许"看着差不多"就拼进时间轴。** 一条命令查六项，退出码 2 就是不合格：
 
----
+```bash
+# B 纸带型（有载体可量）
+python scripts/check_title.py --clip clips/s01.mp4 --area 760,66,1160,622
+# A 压字型（无载体，只查水印与时长，版式人工抽帧）
+python scripts/check_title.py --clip clips/s01.mp4 --layout overlay
+```
+
+| 项 | 门槛 | 脚本能查 |
+|---|---|---|
+| 水印 | 四角任一检出即不合格 | ✅ |
+| 时长 | 4.5–7.0s | ✅ |
+| 首字留白 | ≥ 载体高 6.5% | ✅ |
+| 占载体高 | 60–87% | ✅ |
+| 居中 | 字块中心 = 载体中线（±8px）= 画面中线（±8%） | ✅ |
+| 出画 | 首末帧载体都完整在画面内 | ❌ 人工抽两帧 |
+
+> **人工只剩两件事**：抽首帧和末帧看出画、读一遍人名有没有写错。
+> 其余全部交给脚本，别靠眼睛。
+
+### 不合格怎么办（按顺序试，不设次数上限）
+
+| 症状 | 处理 |
+|---|---|
+| 水印还在 | 回到坑 2：按检测出的 bbox 重裁 → 复测 |
+| 首字贴边 / 占比不对 | 重跑 `make_title.py --vertical`（会强制留白）；还不行说明载体太小，回 ImageGen 把纸幡生成得更高 |
+| 字被推歪、笔画糊、载体变形 | 换 `locked-off` 提示词重生成视频；仍不行退 zoompan |
+| 时长不对 | 改 `-frames:v N` 重出 |
+| 字错 / 多出物料 / 主体跑了 | 底图重生成，重新排字 |
+
+**每一轮都重跑 `check_title.py`，直到 `exit 0`。**
+不要因为"已经重做了三次"就放行——放行的代价是整片带缺陷交付。
+
+### 为什么这条要写死
+
+真实事故：片头在另一台机器上生成，水印位置比本机靠右，按固定 110px 裁完恰好留了半截；
+同时没有任何强制验收，结果**带着水印的片头直接进了成片**。
+所以这里不是"建议检查"，是**不过不许往下走**。
 
 ## 七、一句话总结
 

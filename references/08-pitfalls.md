@@ -345,14 +345,19 @@ negative 挂 `zoom in, push in, cropped banner`。并且**首帧和末帧都要�
 
 ---
 
-## 21. VideoGen 的水印在左上角，和 ImageGen 不是一回事
+## 21. 水印位置是浮动的，固定 crop 值一定漏
+
+> 早期写法：VideoGen 水印在左上角，裁 110px 就行。**这条是错的**，
+> 实测本机水印 bbox 到 x=127（裁 110 剩 17px），另一台机器更靠右，110px 完全没裁到。
 
 **症状**：按右下角裁完，左上角仍有「AI生成」。
 
 **原因**：两个工具的水印位置不同。
 
-**修法**：VideoGen → `crop=1700:956:110:0`（左右对称裁掉左侧 110px）再 `scale=1920:1080`；
-ImageGen → 裁底部（3:4 图裁到 y=1365）。
+**修法**：先测再裁再复测——
+`python scripts/check_title.py --clip raw.mp4 --only watermark` 拿到 bbox，
+按 `wm_right + 8` 两边对称裁，再跑一次确认四角全绿。
+ImageGen 侧则在右下角，3:4 图裁到 y=1365、16:9 裁 `1755:987:0:0`。
 
 ---
 
