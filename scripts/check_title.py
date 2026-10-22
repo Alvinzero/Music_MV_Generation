@@ -101,9 +101,17 @@ def wm_score(im, box, win=(170, 76), stride=8):
     bw, bh = xs.max() - xs.min() + 1, ys.max() - ys.min() + 1
     aspect = bw / float(bh)
     cov = len(xs) / float(bw * bh)          # 文字笔画只占包围盒的一小部分
-    if bw < 40 or not (1.2 <= aspect <= 7.0) or not (0.06 <= cov <= 0.55):
+    if bw < 40 or not (1.2 <= aspect <= 7.0) or not (0.15 <= cov <= 0.55):
         return 0.0, None
-    score = min(1.0, best / 420.0)
+    # 水印牌贴在画幅角上：包围盒距所在角的两条边 ≤ 48px（纸面亮块通常离角更远）
+    gx0, gy0 = x0 + bx + int(xs.min()), y0 + by + int(ys.min())
+    gx1, gy1 = x0 + bx + int(xs.max()), y0 + by + int(ys.max())
+    W0, H0 = im.size
+    dist_h = gx0 if gx1 < W0 / 2 else W0 - gx1
+    dist_v = gy0 if gy1 < H0 / 2 else H0 - gy1
+    if dist_h > 48 or dist_v > 48:
+        return 0.0, None
+    score = min(1.0, best / 1200.0)
     return round(score, 3), (x0 + bx + int(xs.min()), y0 + by + int(ys.min()),
                              x0 + bx + int(xs.max()), y0 + by + int(ys.max()))
 

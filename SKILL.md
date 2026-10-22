@@ -168,6 +168,19 @@ python scripts/check_title.py --clip clips/s01.mp4 --area 760,66,1160,622
 **水印位置是浮动的**，不许套固定 crop 值——先 `--only watermark` 量出 bbox，再裁，再复测。
 （真实事故：另一台机器生成时水印更靠右，按固定 110px 裁完留了半截，直接进了成片。）
 
+**字不能交给生成模型。** 把已排字的静帧丢给图生视频，模型一定会重绘歌名（实测末帧整行消失）。
+走「背景归模型、文字归图层」：无字场景生成运动 → PIL 静态文字层 → overlay 盖 N 帧。
+
+**接回时间轴前先过切点匹配**，片头合格 ≠ 剪进去不刺眼：
+
+```bash
+python scripts/match_cut.py --a work/s01.mp4 --b work/s02.mp4 --outdir work/match
+#   切点前 差 25.4 → 切点后 差 0.5  [通过]   判据：亮度差 ≤ 4
+```
+
+它只改两侧的出入口（A 尾巴加雾、B 开头拉焦），**帧数一帧不动**——叠化会吃掉重叠帧，
+总帧一变字幕全部错位，所以不能用 xfade 解决切点问题。
+
 ### ⑩ 时间轴 / 拼接 / 混音 → `references/04-assembly.md`
 
 帧是唯一真相；叠化要扣重叠帧；音频先出母版（-14 LUFS / TP ≤ -1.0）再挂。
@@ -267,6 +280,7 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 - [ ] 字幕逐句查过画面：人脸、手、乐器、道具、建筑中轴都没被压
 - [ ] 亮处、暗处各抽两帧确认字幕没糊
 - [ ] 片头歌名是画面的一部分；首字不贴载体边缘；抽首末帧没出画
+- [ ] 片头接了第一镜且**切点亮度差 ≤ 4**（`match_cut.py`），抽 5 个点看过切点两侧
 - [ ] **样张经用户确认**（关2），`style.md` 里留了确认记录；确认前没有开任何批量
 - [ ] 封面单独出图（不用第一帧），3:4 或 16:9 按平台；文字居中、逐字核对过
 - [ ] 375px 宽下字幕、封面标题都可读
@@ -288,7 +302,7 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 | `05-subtitles.md` | **选字幕族、定参数** |
 | `05b-subtitle-recipes.md` | **12 套字幕配方的完整参数**（载体/字形/动效/ASS 写法） |
 | `05a-subtitle-layout.md` | 逐句落位、字号档、卡片像素级做法 |
-| `06-title-card.md` | 做片头（含 VideoGen 四个坑） |
+| `06-title-card.md` | 做片头（载体选择、背景/文字分层、六个坑、切点匹配） |
 | `07-cover.md` | 做封面（含直出核对清单） |
 | `08-pitfalls.md` | 出问题先查这里（23 条实踩） |
 | `09-style-library.md` | 31 套风格，选风格时翻 |
@@ -319,6 +333,9 @@ python scripts/place_subs.py
 # 片头 / 封面
 python scripts/make_title.py --src images/plate.png --title "歌名" --singer "歌手" \
     --vertical --area x0,y0,x1,y1 --still out/title_still.png
+python scripts/crop_watermark.py --src raw_title.mp4 --out clips/s01.mp4   # 先测后裁再复测
+python scripts/check_title.py --clip clips/s01.mp4 --layout overlay       # 六项验收
+python scripts/match_cut.py --a clips/s01.mp4 --b clips/s02.mp4 --outdir work/match  # 切点匹配
 python scripts/make_cover.py --src cover/base.png --title "歌名" --artist "歌手" \
     --ratio 3:4 --vertical --area x0,y0,x1,y1 --out cover/封面.png
 
