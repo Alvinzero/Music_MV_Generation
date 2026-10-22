@@ -29,7 +29,7 @@ SAFE_X = 26
 
 PAPER = (242, 230, 206)
 INK = (74, 66, 68)
-SHADOW = (150, 138, 126)
+SHADOW = (118, 104, 92)
 CORAL = (231, 170, 156)
 CORAL_INK = (251, 245, 236)
 
@@ -249,7 +249,7 @@ def emit(out, item, grid):
         py = float(item.get("y", 900)) - (0 if vert else span / 2.0)
         ov = (r"{\an7\pos(%.1f,%.1f)\p1\bord0\shad0\1c%s\3c%s\fad(420,320)}"
               % (px, py, bgr(col), bgr(col)))
-        out.append("Dialogue: 2,%s,%s,Shape,,0,0,0,,%s%s{\p0}"
+        out.append(r"Dialogue: 2,%s,%s,Shape,,0,0,0,,%s%s{\p0}"
                    % (ts(float(item["start"])), ts(float(item.get("hold_end", item["end"]))),
                       ov, path))
         return
@@ -272,7 +272,7 @@ def emit(out, item, grid):
             path = torn_rect(w, h, int(item.get("seed", 7)), float(item.get("jag", 5)))
         else:
             path = "m 0 0 l %.1f 0 l %.1f %.1f l 0 %.1f z" % (w, w, h, h)
-        out.append("Dialogue: 1,%s,%s,Shape,,0,0,0,,%s%s{\p0}"
+        out.append(r"Dialogue: 1,%s,%s,Shape,,0,0,0,,%s%s{\p0}"
                    % (ts(float(item["start"])), ts(float(item.get("hold_end", item["end"]))),
                       ov, path))
         return
@@ -303,8 +303,11 @@ def emit(out, item, grid):
     emph = {int(k): float(v) for k, v in (item.get("emph") or {}).items()}
 
     # 题字整块快速浮出，不跟着唱词慢慢铺
-    times = ([start + i * 0.10 for i in range(len(text))]
-             if is_title else grid.plan(start, end, len(text)))
+    if item.get("times") and len(item["times"]) == len(text):
+        times = [max(float(v), start) for v in item["times"]]
+    else:
+        times = ([start + i * 0.10 for i in range(len(text))]
+                 if is_title else grid.plan(start, end, len(text)))
 
     kind = item.get("kind")
     if kind in ("banner", "plain"):
@@ -328,7 +331,7 @@ def emit(out, item, grid):
         path = "m 0 0 l %.1f 0 l %.1f %.1f l 0 %.1f z" % (w, w, th, th)
         ov = (r"{\an7\pos(%.1f,%.1f)\p1\bord0\shad0\1c%s\3c%s\fad(420,320)}"
               % (cx - w / 2.0, cy - th / 2.0, bgr(col), bgr(col)))
-        out.append("Dialogue: 2,%s,%s,Shape,,0,0,0,,%s%s{\p0}"
+        out.append(r"Dialogue: 2,%s,%s,Shape,,0,0,0,,%s%s{\p0}"
                    % (ts(start), ts(disp_end), ov, path))
         return
 
@@ -445,7 +448,7 @@ def emit(out, item, grid):
                     if string:
                         out.append(
                             "Dialogue: 0,%s,%s,Shape,,0,0,0,,"
-                            "{\an7%s\p1\bord0\shad0\1c%s\3c%s}%s{\p0}"
+                            r"{\an7%s\p1\bord0\shad0\1c%s\3c%s}%s{\p0}"
                             % (ts(t_on), ts(t_end), pos_shape,
                                bgr(item.get("string_color", (146, 118, 100))),
                                bgr(item.get("string_color", (146, 118, 100))), string))

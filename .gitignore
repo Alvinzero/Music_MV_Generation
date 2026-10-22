@@ -12,3 +12,9 @@ generated-videos/
 *.mp3
 *.wav
 *.m4a
+
+# 对齐/生成过程中的中间产物
+qa/
+*.ass
+sync_report.json
+score.json

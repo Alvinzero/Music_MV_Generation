@@ -1,146 +1,169 @@
-# anim-mv · 动画 MV 制作 Skill
+# Music_MV_Generation · 从一首歌到一条能发的 MV
 
-把一首歌做成一支动画风 MV：**先听歌推荐风格 → 定分镜 → 出图 → 图生视频 → 卡拍点剪时间线 → 逐字弹字幕 → 混音出片**。
+把一首歌（或一批素材）做成一支出得去的音乐 MV：**分析素材 → 选风格 → 出样张 → 写脚本 → 分镜 →
+批量出图 → 图生视频 → 拼时间轴 → 定字幕 → 做片头 → 质检 → 出封面**。
 
-A skill for turning a song into an animated music video: style recommendation from audio analysis, beat-synced storyboard, AI stills, image-to-video, timeline assembly and karaoke-style subtitles.
+An agent skill for turning a song into a publishable music video — with scoring gates, a
+per-video subtitle language, and per-character lyric alignment.
 
-> 实测案例：周杰伦《等你下课》4 分 30 秒、47 个镜头、纸雕拼贴风，全片 1080p / 24fps。
+> 由原来的 `anim-mv` 与 `video-finisher` 合并重构而来。前者偏"从零造素材"，后者偏"后期成片"，
+> 现在是一条路：**先想清楚，再造素材，最后后期。**
 
 ---
 
-## 它能做什么
+## 这是什么
 
-| 环节 | 脚本 | 产出 |
+一个 **Agent Skill**，不是一个能双击运行的软件。`SKILL.md` 是主体（给 AI 读的工作流），
+`references/` 是各环节的详细做法，`scripts/` 是可直接调用的工具。
+
+核心信条两句话：
+
+1. **AI 负责决策，工具负责精确**——时间值、规格、响度一律实测，不许模型估算。
+2. **先做多，再做少**——每个关键选择都有候选、有打分、有淘汰，不是第一个想法就用。
+
+---
+
+## 主流程：13 步，四道关
+
+```
+①素材分析 → ②风格选项 ═关1═ → ③样张 ═关2═ → ④剧情方案 → ⑤分镜表 ═关3═
+→ ⑥分镜提示词 → ⑦批量出图 → ⑧批量出视频 → ⑨片头 → ⑩时间轴/拼接
+→ ⑪字幕 → ⑫质检 ═关4═ → ⑬封面交付
+```
+
+四道关都是**跟用户交互**，不是自己判断完就往下走：
+
+| 关 | 用户看到什么 | 过关条件 |
 |---|---|---|
-| 听歌选风格 | `scripts/style_advisor.py` | BPM / 响度 / 明亮度 / 发音点密度 / 歌词意象 → 按契合度排序的 3 套风格 |
-| 测拍点 | `scripts/beat_sync.py` | `beats.json`：BPM、相位 offset、1/8 拍网格 |
-| 拆曲式报成本 | `scripts/song_structure.py` | 段落强度、建议单镜时长、**总镜数与预估 credits** |
-| 卡拍点剪时间线 | `scripts/make_timeline.py` | xfade 脚本，切点自动吸附拍点，叠化中点压拍 |
-| 逐字纸卡字幕 | `scripts/make_subs.py` | ASS 字幕，**逐句独立定位与字号**，一字一纸卡、衬线字、珊瑚高亮、可放大重音 |
-| 出片 | 见 `references/ffmpeg-recipes.md` | delogo 去角标 + 调色 + 烧字幕 + loudnorm |
+| 关1 风格 | 5 个风格选项 + 推荐度 + 代价 | 明确选定一个主题 |
+| 关2 样张 | 选定风格的 3 张静帧（特写 / 空镜 / 情绪） | 说"可以"才允许任何批量 |
+| 关3 分镜表 | 镜头 ↔ 歌词对照表 | 确认后才写提示词 |
+| 关4 终版 | 粗剪 / 成片 | 确认后才出封面 |
 
-## 字幕是逐镜排的，不是固定一行
+---
 
-这是本 skill 和"自动生成字幕"最大的区别：**每句歌词的位置和字号都不一样**。
+## 四个不太常见的机制
 
-同一个片子里，人物可能站在画面中间、躺在画面底部、或者整幅都是人群，
-一条固定高度的字幕必然会压到某几句的主体。所以流程是：
-出完 `base.mp4` → 按每句中点抽帧 → 在帧上找空档 → 逐句写 `x`/`y`/`fs`。
+### 1. 三层打分 + 可生成性红线
 
-```json
-{"start":68.0,"end":73.0,"text":"躺在你学校的操场看星空","x":1250,"y":612,"fs":60,"accent":2}
-{"start":113.0,"end":120.0,"text":"当你收到情书 也代表我已经走远","x":960,"y":104,"fs":58,
- "accent":1,"emph":{"13":1.4}}
-```
-
-装不下就降字号（66→60→58→56→52），横穿构图重心（钟楼、大门、对称特写）时
-拆成左右两段。完整方法、字号对照表、落点选择与验收清单见
-[`references/subtitle-layout.md`](references/subtitle-layout.md)。
-
-### 卡片长什么样
-
-这套卡片语法是照着一支参考 MV **逐帧量出来**的，不是拍脑袋定的：
-
-| 项 | 值 | 项 | 值 |
+| 层 | 对象 | 候选 | 最高权重 |
 |---|---|---|---|
-| 纸面色 | `#F2E6CE` | 字色 | `#4A4244` |
-| 高亮卡 | `#E7AA9C` + 米色字 | 投影 | `#968A7E`，偏移 4px |
-| 倾斜 | ±2.8°（固定种子） | 纵向错落 | ±6px |
-| 字间 | **−6px**（叠压） | 出现 | 缩放 88→100，80ms |
+| L1 | 视觉风格 | 5 套（不同家族） | 情绪匹配 0.30 / 出图稳定 0.20 |
+| L2 | 剧情方案 | 3 套 | **钩子 0.20** / 歌词咬合 0.20 |
+| L3 | 单镜提示词 | 每镜 2–3 条 | 主体 0.20 / 可生成 0.20 |
 
-三个关键决定：**逐字出现**而不是整行淡入、**字体用宋体**而不是无衬线、
-**一句里允许字号不统一**（`emph` 把关键字放大 1.3–1.5 倍）。
-换掉任何一条，这套风格就散了。
+配套**红线扣分**：手部特写 −1.5、画面内文字 −2.0、三人以上 −1.0、精细机械 −1.0。
+淘汰最多三轮，分差 ≤0.3 时按"可生成性"决胜——**能出片的赢，好看的输**。
 
-### 字幕还要和画面联动
+### 2. 字幕：12 套配方，按八个画面特征推导
 
-这是最容易漏的一条。参考片唱到"广袤无垠的大海"时，字幕**撤掉了纸卡**，
-字变成海面的深蓝 `#2D4A6B`，高度从 119px 长到 157px（720p），横贯整个画面，
-只留一圈浅色描边浮在天空上——词本身变成了风景的一部分。
+不是"暗调就用暖光字"这种四选一。每部片先读八个特征（明度 / 主色 / 材质 / 光向 / 密度 / 运动 /
+年代 / 情绪），再给 12 套配方打分取 top2。七维度定完（载体 / 字形 / 字色逻辑 / 分离手段 /
+入场动效 / 排布 / 与画面的关系），一套样式才唯一。
 
-```json
-{"start":68.0,"end":73.0,"text":"躺在你学校的操场看星空","x":960,"y":600,
- "fs":104,"mode":"scene","ink":[228,213,196],"edge":[10,43,82]}
+```bash
+python scripts/subtitle_router.py --profile out/sub_profile.json
 ```
 
-规则是反的：**亮而开阔**的场景撤卡、取场景暗色、放大 2–3 倍；
-**暗而拥挤**的场景保留纸卡、让卡面浸染环境色。搞反了就糊成一片。
-全片用 2–3 次就够，多了不叫联动，叫没排版。详见
-[`references/subtitle-layout.md`](references/subtitle-layout.md) 第七节。
+### 3. 对齐：一套算法，逐字校到 0.3s
 
-## 8 套内置风格
+官方时间戳、歌词表、已烧录的 ASS 都走同一个入口，不再有第二套参数：
 
-`papercut` 纸雕拼贴 · `clay` 黏土定格 · `gouache` 水粉绘本 · `ink` 水墨留白 ·
-`felt` 羊毛毡布偶 · `flatvector` 扁平矢量 · `glass` 彩绘玻璃 · `retroprint` 复古丝网
+```bash
+python scripts/align_subs.py --audio song.m4a --lines out/lines.json \
+    --out out/lines_sync.json --max-err 0.30 --strict
+```
 
-每套都给全了配色 hex、角色做法、可直接粘进生图模型的英文关键词、字幕样式与成本系数，
-见 [`references/style-library.md`](references/style-library.md)。
+任何一个字偏差超 0.30s 就返回 2。C 级句子会被逐条列出，必须人工听。
 
-风格不是随便挑的：脚本会算歌曲的速度区间、能量密度、频谱明亮度和歌词意象分类，
-再和每套风格的适配区间打分。**先给结论，再让用户三选一**，不一次甩八个上去。
+### 4. 片头与封面：字必须长在画面里
+
+- **片头**：歌名不是字幕层。ImageGen 出无字载体 → `make_title.py` 字库排字 → 图生视频。
+  脚本强制上下各留 6.5%，手写按高度算满会把首字顶到纸边。
+- **封面**：文字站中间、有载体。标题优先让 ImageGen 直出（逐字核对），核对不过才退字库合成。
+
+---
+
+## 仓库结构
+
+```
+SKILL.md                  主体：13 步流程、四道关、硬规矩 15 条、交付清单
+references/
+  01-brief.md             素材分析 → 意象表 → 风格选项 → 样张迭代
+  02-scoring.md           三层打分机制（权重、红线、淘汰规则、JSON 格式）
+  03-generation.md        七段式提示词、批量出图、图生视频与逐镜验收
+  04-assembly.md          时间轴、拼接、混音、渲染
+  04a-timeline.md         timeline.json 规范
+  04b-alignment.md        字幕对齐（统一算法 + 0.3s 门槛）
+  04c-ffmpeg.md           常用 ffmpeg 配方
+  05-subtitles.md         字幕样式推导（七维度 + 八特征）
+  05a-subtitle-layout.md  逐句落位、字号档、卡片像素级做法
+  05b-subtitle-recipes.md 12 套字幕配方的完整参数
+  06-title-card.md        片头（载体选择、VideoGen 四个坑）
+  07-cover.md             封面（直出核对清单、版式标准）
+  08-pitfalls.md          24 条实踩的坑
+  09-style-library.md     31 套视觉风格
+  10-remotion.md          可选后端
+scripts/                  24 个脚本（见下）
+assets/fonts/             MV Serif SC（衬线）、站酷快乐体
+assets/*.example.json     lines.json / beats.json 的字段示例
+```
+
+常用脚本：
+
+| 脚本 | 干什么 |
+|---|---|
+| `mediainfo.py` / `song_structure.py` / `beat_sync.py` | 素材体检、曲式与镜数、拍点 |
+| `style_advisor.py` | 31 套风格里出候选 |
+| `score_candidates.py` | 按权重算候选分、标红线、排序 |
+| `align_subs.py` / `align_core.py` | 统一对齐 + 逐字校对（0.3s 门槛） |
+| `make_subs.py` / `make_subs_glow.py` | 出 ASS（有载体 / 无载体，后者支持 `--recipe`） |
+| `subtitle_router.py` | 12 套字幕配方打分 |
+| `make_title.py` / `make_cover.py` | 片头排字、封面合成 |
+| `timeline.py` / `render_ffmpeg.py` / `quality_check.py` | 时间轴、渲染、质检 |
+
+---
 
 ## 环境
 
 ```bash
-python -m pip install numpy imageio-ffmpeg
-python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
+python -m pip install numpy pillow scipy
 ```
 
-`imageio-ffmpeg` 自带一份完整 ffmpeg（含 libx264 / libass / libfreetype / xfade / loudnorm），
-系统里没有 ffmpeg 也能跑。要用 `ass` 烧字幕，ffmpeg 必须带 **libass**。
+还需要 **ffmpeg** 在 PATH 里（Windows 下 `fontsdir` 要写绝对路径 + 转义盘符）。
+Python 3.10+。字体已随仓库附带，不需要额外下载。
 
-## 快速开始
+---
+
+## 三步试跑
 
 ```bash
-# 1. 听歌 + 读词 → 三套候选风格
-python scripts/style_advisor.py --audio song.mp3 --title "歌名" --lyrics lyrics.txt --json out/style.json
+# 1) 体检 + 曲式（先知道这首歌有多少镜、大概多少钱）
+python scripts/mediainfo.py assets/ -o out/manifest.json
+python scripts/song_structure.py --audio song.m4a -o out/structure.json
 
-# 2. 定风格后取锁定参数（单镜时长 / 叠化 / 成本系数）
-python scripts/style_advisor.py --audio song.mp3 --pick papercut
+# 2) 出 5 个风格选项（不花 credits）
+python scripts/style_advisor.py --audio song.m4a --lyrics lyrics.txt
 
-# 3. 测拍点
-python scripts/beat_sync.py song.mp3 -o out/beats.json
-
-# 4. 拆曲式，报总镜数与成本
-python scripts/song_structure.py --audio song.mp3 -o out/structure.json
-
-# 5. 排完分镜后剪时间线
-python scripts/make_timeline.py --bounds 0,4.9,8.3,11.7 --beats out/beats.json \
-    --total 56.026 --clip-len 6.04 --fade 0.5 --out out/filter_base.txt
-
-# 6. 生成字幕
-python scripts/make_subs.py --lines out/lines.json --beats out/beats.json \
-    --font "ZCOOL KuaiLe" --out out/subs.ass
+# 3) 定好风格后，对齐字幕时间
+python scripts/align_subs.py --audio song.m4a --lines out/lines.json \
+    --out out/lines_sync.json --max-err 0.30 --strict
 ```
 
-完整的十步流水线、参数速查、验收清单写在 [`SKILL.md`](SKILL.md)；
-18 条踩坑记录（并行出图撞名、ASS 颜色是 BGR 倒序、fontsdir 必须绝对路径转义盘符、
-字幕首字吸附偏向后方会累积成慢半拍、`-ss` 放 `-i` 前会让字幕静默不画……）见 [`references/pitfalls.md`](references/pitfalls.md)。
+---
 
-## 成本参考
+## 实测数据
 
-单镜 ≈ 93 credits（1 张图 + 6 秒视频）。60 秒约 11 镜 ≈ 1000 credits；
-4 分半约 47 镜 ≈ 4400 credits。开工前先报数，别让用户跑完才发现贵。
+| 项 | 数字 |
+|---|---|
+| 单镜成本 | ≈93 credits（图 8 + 6 秒视频 85） |
+| 40 镜全片 | ≈3700 credits / 2–4 小时 |
+| 字幕对齐（36 句 / 278 字） | 中位偏差 0.038s、p95 0.268s、最大 0.384s |
+| 质检项 | 规格 / 响度 / 黑帧 / 冻结帧 / 字幕越界，五项全过 |
 
-## 目录
+---
 
-```
-SKILL.md                  十步主流程 + 参数速查 + 验收清单
-scripts/                  风格推荐 / 测拍 / 拆曲式 / 时间线 / 字幕
-references/               风格库、字幕布局、ffmpeg 配方、踩坑记录
-assets/                   示例 json、字幕字体
-```
+## 说明
 
-## 用法（WorkBuddy / Claude Skill）
-
-把整个目录放进 skills 目录（如 `~/.workbuddy/skills/anim-mv/`），
-然后说「给《某首歌》做个动画 MV，歌词和 mp3 在这」即可。
-也可以直接把 `SKILL.md` 的内容贴进对话让模型照着执行。
-
-## 字体授权
-
-仓库带了两款字体，都是 SIL Open Font License 1.1，可随本项目一起分发：
-
-- `assets/fonts/MVSerifSC-SemiBold.ttf` —— 思源宋体（Noto Serif SC）SemiBold 固化实例，
-  族名改为 `MV Serif SC`，避免和系统里的可变字体撞车。**默认字幕就用它。**
-- `assets/fonts/ZCOOLKuaiLe-Regular.ttf` —— 站酷快乐体，圆润无衬线，做轻松题材时备选。
+这个仓库是工作流本身，不含任何歌曲、素材或成片。实际生成依赖 ImageGen / VideoGen 等外部能力，
+脚本只负责"把参数算准、把时间对齐、把片子拼对"。
