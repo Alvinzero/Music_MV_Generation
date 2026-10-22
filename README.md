@@ -103,7 +103,8 @@ references/
   05a-subtitle-layout.md  逐句落位、字号档、卡片像素级做法
   05b-subtitle-recipes.md 12 套字幕配方的完整参数
   06-title-card.md        片头（载体选择、背景/文字分层、六个坑、切点匹配）
-  07-cover.md             封面（直出核对清单、版式标准）
+  07-cover.md            封面（版式、直出核对）
+11-copywriting.md      **发布文案：克制叙述法**（讲事实不讲感受、平台字数）             封面（直出核对清单、版式标准）
   08-pitfalls.md          27 条实踩的坑
   09-style-library.md     31 套视觉风格
   10-remotion.md          可选后端
