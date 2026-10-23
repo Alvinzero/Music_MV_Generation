@@ -17,7 +17,7 @@ burn per-character-synced lyrics, then ship a cover and a QC-checked MP4.
 ## What it is
 
 An **agent skill**, not a double-clickable app. `SKILL.md` is the workflow an AI agent follows;
-`references/` holds the per-stage playbooks (16 files); `scripts/` holds 27 runnable tools.
+`references/` holds the per-stage playbooks (16 files); `scripts/` holds 32 runnable tools.
 The division of labour is deliberate:
 
 - **The model decides; the tools measure.** Timing, specs and loudness are always measured,
@@ -97,10 +97,19 @@ python scripts/make_subs.py --lines out/lines_sync.json --style auto --out out/s
 ```
 SKILL.md          the workflow (what the agent reads)
 references/       16 playbooks: scoring, subtitle styles, title cards, pitfalls…
-scripts/          27 tools: timeline, align, subtitles, render, QC, cover…
+scripts/          32 tools: timeline, align, subtitles, render, QC, cover…
 assets/           fonts and example briefs
 docs/results/     the samples above
 ```
+
+Common scripts:
+
+| Script | What it does |
+|---|---|
+| `align_subs.py` / `align_core.py` | Unified alignment + per-character proofreading (0.3 s ceiling) |
+| `realign_ttml.py` / `realign_mid.py` | Official TTML per-character skeleton when available; audio features (F0 voiced segments / strong onsets) |
+| `eval_timeline.py` | Side-by-side timeline scoring — uses voiced segments as hard truth (silent-hit rate, cross-silent spans) |
+| `diff_ass.py` | Diff two ASS files line by line, proving a timeline edit left styles and animation untouched |
 
 ## License
 
