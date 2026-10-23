@@ -1,5 +1,7 @@
 # Music_MV_Generation · 从一首歌到一条能发的 MV
 
+**[English](README.en.md)** · 中文
+
 把一首歌（或一批素材）做成一支出得去的音乐 MV：**分析素材 → 选风格 → 出样张 → 写脚本 → 分镜 →
 批量出图 → 图生视频 → 拼时间轴 → 定字幕 → 做片头 → 质检 → 出封面**。
 
@@ -20,6 +22,18 @@ per-video subtitle language, and per-character lyric alignment.
 
 1. **AI 负责决策，工具负责精确**——时间值、规格、响度一律实测，不许模型估算。
 2. **先做多，再做少**——每个关键选择都有候选、有打分、有淘汰，不是第一个想法就用。
+
+---
+
+## 产出示例
+
+全部由本仓库流程实际产出：《无人知晓的我》3 分 29 秒，纸雕夜城风格，1080p24。
+
+| 分镜（场景图） | 成片截帧 | 封面 |
+|---|---|---|
+| ![](docs/results/01-storyboard-scene.jpg) | ![](docs/results/02-film-frame.jpg) | ![](docs/results/03-cover.jpg) |
+
+30 秒片段（含片头与字幕）：[`docs/results/preview-30s.mp4`](docs/results/preview-30s.mp4)
 
 ---
 
