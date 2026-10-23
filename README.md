@@ -90,14 +90,16 @@ python scripts/align_subs.py --audio song.m4a --lines out/lines.json \
 
 任何一个字偏差超 0.30s 就返回 2。C 级句子会被逐条列出，必须人工听。
 
-### 4. 片头与封面：字必须长在画面里
+### 4. 片头与封面
 
 - **片头**：歌名不是字幕层。先出**场景**（不是一块广告牌），再版式排版——
   A 压字型（场景满幅、字压中部）或 B 纸带型（底部纸带承字），眉标/主标/细线/出处四件套。
   生成后必须过 `check_title.py`：水印、时长、留白、占宽、居中，不合格一律重做。
   接回时间轴前必须过 `match_cut.py`：片头合格 ≠ 剪进去不刺眼，切点亮度差要收到 ≤4。
   脚本强制上下各留 6.5%，手写按高度算满会把首字顶到纸边。
-- **封面**：文字站中间、有载体。标题优先让 ImageGen 直出（逐字核对），核对不过才退字库合成。
+- **封面**：只按 `references/07b-cover-brief.md`（抖音系列封面标准化生图提示词 V2.0）出图。
+  构图、字体、字色、标题位置、质感、禁止项全照它，没有第二套版式说法。
+  `07-cover.md` 只负责图出来之后的裁水印、导出、自检。
 
 ---
 
@@ -117,11 +119,10 @@ references/
   05a-subtitle-layout.md  逐句落位、字号档、卡片像素级做法
   05b-subtitle-recipes.md 12 套字幕配方的完整参数
   06-title-card.md        片头（载体选择、背景/文字分层、六个坑、切点匹配）
-  07-cover.md            封面（版式、直出核对）
-11-copywriting.md      **发布文案：克制叙述法**（讲事实不讲感受、平台字数）             封面（直出核对清单、版式标准）
+  07b-cover-brief.md      **封面唯一依据**：抖音系列封面标准化生图提示词 V2.0
+  07-cover.md             封面出图之后：裁水印 / 导出 / 自检（不含设计规则）
   08-pitfalls.md          29 条实踩的坑
   09-style-library.md     31 套视觉风格
-  07b-cover-brief.md      封面直出简报 V2.0（六维度 + 固定 DNA + 禁止项）
   10-remotion.md          可选后端
   11-copywriting.md       发布文案：克制叙述法
 scripts/                  28 个脚本（见下）
@@ -139,9 +140,8 @@ assets/*.example.json     lines.json / beats.json 的字段示例
 | `align_subs.py` / `align_core.py` | 统一对齐 + 逐字校对（0.3s 门槛） |
 | `make_subs.py` / `make_subs_glow.py` | 出 ASS（有载体 / 无载体，后者支持 `--recipe`） |
 | `subtitle_router.py` | 12 套字幕配方打分 |
-| `make_title.py` / `make_cover.py` | 片头排字（压字/纸带两种版式）、封面合成 |
+| `make_title.py` | 片头排字（压字/纸带两种版式） |
 | `check_title.py` / `crop_watermark.py` | 片头验收（水印/时长/留白/居中）、一键裁水印并复测 |
-| `make_poster34.py` | 横版作品转 3:4 主页封面（模糊延展 / 纸卡明信片） |
 | `match_cut.py` | 切点匹配：改两侧出入口（A 尾巴加雾 / B 开头拉焦），帧数不动，亮度差收到 ≤4 |
 | `timeline.py` / `render_ffmpeg.py` / `quality_check.py` | 时间轴、渲染、质检 |
 

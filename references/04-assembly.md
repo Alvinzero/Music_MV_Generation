@@ -105,4 +105,4 @@ ls -l --time-style=+%H:%M:%S out/final.mp4 out/subs_v2.ass
 
 **成片时间必须晚于字幕文件**，否则你渲的是旧字幕（这个坑真的踩过）。
 
-然后按 `SKILL.md` 的交付清单逐条过，最后做封面（`07-cover.md`）。
+然后按 `SKILL.md` 的交付清单逐条过，最后做封面（按 `07b-cover-brief.md` 出图，处理见 `07-cover.md`）。

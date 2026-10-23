@@ -40,8 +40,10 @@ Four mechanisms that make the output look intentional rather than generated:
    (luminance, gradient, saturation…), so text never lands on a busy area.
 3. **Per-character lyric alignment** with a hard 0.3 s ceiling; every entry point goes through
    the same `align_subs.py`.
-4. **Title and cover are typography inside the image**, not an overlay: the words must live on a
+4. **The title card is typography inside the image**, not an overlay: the words must live on a
    physical carrier in the scene (paper banner, shop sign), so they bend with the artwork.
+   Covers follow `references/07b-cover-brief.md` only — it is the single source of truth for
+   cover design and prompting.
 
 ## Requirements
 

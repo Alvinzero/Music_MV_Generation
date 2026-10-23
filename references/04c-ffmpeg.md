@@ -78,22 +78,10 @@ $FF -y -i cap/c34.png -i cap/c36.png -i cap/c38.png \
 
 ---
 
-## 6. 封面合成
+## 6. 封面
 
-```bash
-# 底图统一调色
-$FF -y -i clips/v03.mp4 -ss 2.2 -vf "delogo=x=2:y=6:w=140:h=68,eq=contrast=1.05:saturation=1.04,vignette=a=PI/7" -frames:v 1 cover/base.png
-
-# 压米色纸带（含上方三层递减投影）+ 烧片名
-$FF -y -loop 1 -t 1 -i cover/base.png -vf "\
-drawbox=x=0:y=776:w=1920:h=7:color=black@0.10:t=fill,\
-drawbox=x=0:y=783:w=1920:h=7:color=black@0.06:t=fill,\
-drawbox=x=0:y=790:w=1920:h=10:color=black@0.03:t=fill,\
-drawbox=x=0:y=800:w=1920:h=280:color=0xE9DFC9:t=fill,\
-ass=cover.ass:fontsdir='D\:/<abs>/fonts'" -frames:v 1 cover/cover.png
-```
-
-纸带底色建议先从底图**实测**（取底部纯色区中位数），与画面无缝。
+封面不做版式合成。设计与提示词一律按 `07b-cover-brief.md` 出图，出图后只需裁水印、导出，
+步骤见 `07-cover.md`。这里不再提供任何封面版式的 ffmpeg 配方。
 
 ---
 

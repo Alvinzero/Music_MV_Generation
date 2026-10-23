@@ -22,7 +22,7 @@ agent_created: true
 
 | 问题 | 为什么现在问 |
 |---|---|
-| 发哪儿？（抖音/快手/视频号/B站/YouTube） | 决定封面比例（3:4 还是 16:9）、时长剪辑、字幕尺寸 |
+| 发哪儿？（抖音/快手/视频号/B站/YouTube） | 决定时长剪辑、字幕尺寸（封面一律 3:4，见 `07b-cover-brief.md`） |
 | 有没有参考 MV / 参考图？ | 有就先读它的调色、材质、镜头节奏、字幕样式（`01-brief.md` 第二节） |
 | 歌词是最终版吗？ | 歌词一改，分镜和时间轴全废。**先锁歌词** |
 
@@ -219,10 +219,11 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 五项全过：规格 / 响度 / 黑帧 / 冻结帧 / 字幕越界。再加人工三条：逐句查压主体、
 亮暗各抽两帧、375px 自检。
 
-### ⑬ 封面 + 发布文案 → `references/07-cover.md`、`references/11-copywriting.md`
+### ⑬ 封面 + 发布文案 → `references/07b-cover-brief.md`、`references/11-copywriting.md`
 
-**文字站中间、有载体**；标题优先让 ImageGen 直出（逐字核对），核对不过才退字库合成。
-默认 3:4（1080×1440）。
+**封面只按 `07b-cover-brief.md` 出**——那份《抖音系列封面标准化生图提示词 V2.0》是唯一依据，
+构图、字体、字色、标题位置、质感、禁止项全部照它，不另立规则。
+`07-cover.md` 只讲图出来之后怎么裁水印、怎么导出、怎么自检。
 
 文案走**克制叙述法**：只讲作品的物理事实（材料/光/重复/消失），不讲感受；
 零情绪词、不排比不对仗、结尾用事实收（片长 + 歌手），不提问不升华。
@@ -263,7 +264,8 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 7. **字幕样式必须按画面推导**：用八特征给 12 套配方打分，取 top2 出样张；
    禁止「暗调就用某一种」这种套法——那样所有片会撞款。
 8. **字幕坐标逐句定**：躺姿/仰拍/人群镜头必压主体。
-9. **封面文字站中间、有载体**：推到画面顶角就变成一条边角信息。
+9. **封面只认 `07b-cover-brief.md`**：构图、字体、字色、标题位置、质感、禁止项全照它，
+   不再有第二套版式说法。图出来之后才走 `07-cover.md`（裁水印 / 导出 / 自检）。
 10. **字体必须显式加载**：`fontsdir` 绝对路径 + 转义盘符，缺字烧成豆腐块。
 11. **并行生成用唯一前缀**：同名前缀会覆盖，丢过素材。
 12. **音频先出母版再挂**：loudnorm 别塞进视频滤镜链。
@@ -286,7 +288,7 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 - [ ] 片头歌名是画面的一部分；首字不贴载体边缘；抽首末帧没出画
 - [ ] 片头接了第一镜且**切点亮度差 ≤ 4**（`match_cut.py`），抽 5 个点看过切点两侧
 - [ ] **样张经用户确认**（关2），`style.md` 里留了确认记录；确认前没有开任何批量
-- [ ] 封面单独出图（不用第一帧），3:4 或 16:9 按平台；文字居中、逐字核对过
+- [ ] **封面按 `07b-cover-brief.md` 出图**（不用第一帧），3:4 竖版；字数、形近字、多余物料逐条核过
 - [ ] 375px 宽下字幕、封面标题都可读
 - [ ] 发布文案按 `11-copywriting.md` 写：零情绪词、不排比、结尾用事实（抖音标题 ≤20 字）
 - [ ] 成片 mtime 晚于字幕文件
@@ -308,8 +310,8 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 | `05b-subtitle-recipes.md` | **12 套字幕配方的完整参数**（载体/字形/动效/ASS 写法） |
 | `05a-subtitle-layout.md` | 逐句落位、字号档、卡片像素级做法 |
 | `06-title-card.md` | 做片头（载体选择、背景/文字分层、六个坑、切点匹配） |
-| `07-cover.md` | 做封面（比例、横版裁切、直出核对清单） |
-| `07b-cover-brief.md` | **封面直出简报 V2.0**（六个设计维度 + 固定 DNA + 禁止项） |
+| `07b-cover-brief.md` | **封面唯一依据**：抖音系列封面标准化生图提示词 V2.0（六大维度 + 固定 DNA + 禁止项） |
+| `07-cover.md` | 封面出图之后的机械操作：裁水印 / 导出 / 自检（**不含设计规则**） |
 | `11-copywriting.md` | **写发布文案**（克制叙述法：讲事实不讲感受、平台字数、反例对照） |
 | `08-pitfalls.md` | 出问题先查这里（23 条实踩） |
 | `09-style-library.md` | 31 套风格，选风格时翻 |
@@ -337,15 +339,13 @@ python scripts/make_subs_glow.py --lines out/lines_sync.json --out out/subs_glow
     --sheet "images/s%02d.png" --recipe 02-window-glow
 python scripts/place_subs.py
 
-# 片头 / 封面
+# 片头
 python scripts/make_title.py --src images/plate.png --title "歌名" --singer "歌手" \
     --vertical --area x0,y0,x1,y1 --still out/title_still.png
 python scripts/crop_watermark.py --src raw_title.mp4 --out clips/s01.mp4   # 先测后裁再复测
 python scripts/check_title.py --clip clips/s01.mp4 --layout overlay       # 六项验收
 python scripts/match_cut.py --a clips/s01.mp4 --b clips/s02.mp4 --outdir work/match  # 切点匹配
-python scripts/make_poster34.py --src images/s02.png --out cover/p1.png \n    --title "歌名" --artist "歌手 · 纸雕 MV" --style postcard
-python scripts/make_cover.py --src cover/base.png --title "歌名" --artist "歌手" \
-    --ratio 3:4 --vertical --area x0,y0,x1,y1 --out cover/封面.png
+# 封面：按 references/07b-cover-brief.md 出图，图出来之后只需裁水印与导出
 
 # 成片
 python scripts/timeline.py build --manifest out/manifest.json --lines out/lines.json \
@@ -367,7 +367,7 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 | 场景图（每镜 1 张） | 40 镜约 20 分钟 | 并发 4–8 |
 | 图生视频（6s） | 40 镜约 60–90 分钟 | 逐镜抽首末帧验收 |
 | 片头（图 + 视频 + 验收） | 15 分钟 | 不过就重做 |
-| 封面（直出 1–2 张） | 5 分钟 | 逐字核对 |
+| 封面（按 07b 直出 1 张） | 5 分钟 | 逐字核对 |
 | **40 镜全片** | **2–4 小时** | 含重试 |
 
 **工期按 2–4 小时报，不要报「几十分钟」**——重试是常态，不是意外。
