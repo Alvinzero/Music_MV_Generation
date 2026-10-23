@@ -21,6 +21,7 @@
 import argparse
 import os
 import sys
+from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -37,13 +38,18 @@ PAPER = (243, 232, 209)
 INK = (43, 33, 24)
 SUB_INK = (74, 55, 38)
 
+# 字体跟随技能目录（scripts/ 的上一级是技能根），避免技能改名或换机后默认路径失效
+FONT_DIR = Path(__file__).resolve().parents[1] / "assets" / "fonts"
+DEFAULT_FONT = str(FONT_DIR / "MVSerifSC-SemiBold.ttf")
+
 
 def load_font(path, size):
     if path and os.path.isfile(path):
         return ImageFont.truetype(path, size)
     for cand in ("MVSerifSC-SemiBold.ttf", "C:/Windows/Fonts/simsun.ttc"):
-        if os.path.isfile(cand):
-            return ImageFont.truetype(cand, size)
+        for p in (cand, str(FONT_DIR / cand)):
+            if os.path.isfile(p):
+                return ImageFont.truetype(p, size)
     sys.exit("找不到字体，用 --font 指定一个 ttf")
 
 
@@ -175,7 +181,7 @@ def main():
     ap.add_argument("--band-color", dest="band_color", default="auto", choices=["auto", "sample", "paper"])
     ap.add_argument("--title-width", dest="title_width", type=float, default=0.62,
                     help="band 模式标题占画面宽的比例（0.45–0.60 最稳）")
-    ap.add_argument("--font", default="C:/Users/Admin/.workbuddy/skills/anim-mv/assets/fonts/MVSerifSC-SemiBold.ttf")
+    ap.add_argument("--font", default=DEFAULT_FONT)
     ap.add_argument("--ink", default="43,33,24")
     ap.add_argument("--out", required=True)
     ap.add_argument("--anchor", default="center", choices=["center", "top"])
