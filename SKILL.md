@@ -224,6 +224,11 @@ python scripts/realign_ttml.py --audio out/stems/htdemucs/song/vocals.wav \
 - **验收用发声段**：字必须落在 F0 发声段内，落静音率 0 才算过。
   `scripts/eval_timeline.py` 用这个判据做横向评测。
 
+改完时间轴**不要碰排版**：用 `scripts/land_timeline.py` 只更新
+`times`/`start`/`end`/`cut` 四个时间字段，保留已定稿的 `shot`/`y`/`x`/`fs`/`accent`；
+再用 `scripts/diff_ass.py` 确认 ASS 的样式与动画一字未动。
+收尾用 `scripts/verify_final.py`（成片级自检）和 `scripts/final_check.py`（抽帧目视）。
+
 详见 `references/04b-alignment.md` 第六之二节。
 
 ### ⑫ 质检 ══[关4]══

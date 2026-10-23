@@ -125,7 +125,7 @@ references/
   09-style-library.md     31 套视觉风格
   10-remotion.md          可选后端
   11-copywriting.md       发布文案：克制叙述法
-scripts/                  32 个脚本（见下）
+scripts/                  35 个脚本（见下）
 assets/fonts/             MV Serif SC（衬线）、站酷快乐体
 assets/*.example.json     lines.json / beats.json 的字段示例
 ```
@@ -140,6 +140,9 @@ assets/*.example.json     lines.json / beats.json 的字段示例
 | `align_subs.py` / `align_core.py` | 统一对齐 + 逐字校对（0.3s 门槛） |
 | `realign_ttml.py` / `realign_mid.py` | 有官方 TTML 时走逐字骨架；音频特征（F0 发声段 / 强起音） |
 | `eval_timeline.py` | 时间轴横向评测（用发声段做硬真值，落静音率 / 跨静音处数） |
+| `land_timeline.py` | 把新版时间轴落地到 lines_sub，保留排版字段只改时间字段 |
+| `verify_final.py` | 成片级字幕自检（越界 / 同屏冲突 / 落静音率） |
+| `final_check.py` | 抽帧目视 + 音轨对齐最终核对 |
 | `diff_ass.py` | 逐条对比新旧 ASS，确认改时间轴时样式与动画一字未动 |
 | `make_subs.py` / `make_subs_glow.py` | 出 ASS（有载体 / 无载体，后者支持 `--recipe`） |
 | `subtitle_router.py` | 12 套字幕配方打分 |

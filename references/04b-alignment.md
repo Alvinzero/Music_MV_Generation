@@ -293,6 +293,41 @@ for u, v in zip(times, times[1:]):
 同时必须核对 ASS：**样式行、文本、override 标签要一字不差，只有 Start/End 变**。
 写个 diff 脚本逐条比，别靠眼看。
 
+### 6.2.9 落地流程（四个脚本的顺序）
+
+```bash
+# ① 重排，产出新版逐字时间轴
+python scripts/realign_ttml.py --ttml song.ttml --audio separated/.../vocals.wav \
+    --lines out/lines.json --out out/lines_sync_new.json
+
+# ② 横向评测：和上一版比，看硬指标（落静音率 / 跨静音处数 / 同刻塌缩）
+python scripts/eval_timeline.py
+
+# ③ 落地到 lines_sub（保留排版字段，只改时间字段）
+python scripts/land_timeline.py --new out/lines_sync_new.json \
+    --sub-old out/lines_sub_prev.json \
+    --sync-out out/lines_sync.json --sub-out out/lines_sub.json
+
+# ④ 生成 ASS + 逐条 diff，确认样式与动画一字未动
+python scripts/make_subs_glow.py --lines out/lines_sub.json --out out/subs.ass
+python scripts/diff_ass.py out/subs_prev.ass out/subs.ass
+
+# ⑤ 成片级自检（越界 / 同屏冲突 / 落静音率）
+python scripts/verify_final.py --lines out/lines_sub.json \
+    --audio separated/htdemucs/song/vocals.wav --focus-lo 78 --focus-hi 100
+
+# ⑥ 抽帧目视 + 音轨对齐最终核对
+python scripts/final_check.py --video out/final.mp4 --lines out/lines_sub.json \
+    --audio separated/htdemucs/song/vocals.wav --lo 78 --hi 100
+```
+
+`land_timeline.py` 里的 lead / tail 是**沿用上一版相对首尾字的偏移量**再 clamp，
+所以字幕的"起—收"节奏与用户看过的版本一致，只是整体平移到正确位置——
+这是"改时间轴不动观感"的关键，别自己拍一个固定 lead。
+
+`verify_final.py` 的落静音率用 F0 发声段判据。**不要用"到最近强起音的距离"当落静音判据**：
+拖腔尾音本来就没有起音，那样的判据会把正确的时间轴误报成错。
+
 ---
 
 ## 七、拆句规则（影响对齐上限）
@@ -325,6 +360,8 @@ for u, v in zip(times, times[1:]):
 - [ ] 异常大间隔 ≤ 1 句（>1.5s 的字间隔要逐条看：拖腔是合法的，但要确认过）
 - [ ] ASS diff：样式行 0 差异、文本与 override 标签 0 差异、只有 Start/End 变
 - [ ] 排版字段（`shot`/`y`/`x`/`fs`/`accent`）与上一版**逐字节相同**
+- [ ] `verify_final.py` 全曲自检通过（落静音 0、越界 0、同屏冲突 0）
+- [ ] `final_check.py` 重点区间每句首字落在强起音上（≤0.30s）
 
 ### 8.2 拖腔导致的"整齐偏移"识别法
 
