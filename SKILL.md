@@ -308,7 +308,8 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 | `05b-subtitle-recipes.md` | **12 套字幕配方的完整参数**（载体/字形/动效/ASS 写法） |
 | `05a-subtitle-layout.md` | 逐句落位、字号档、卡片像素级做法 |
 | `06-title-card.md` | 做片头（载体选择、背景/文字分层、六个坑、切点匹配） |
-| `07-cover.md` | 做封面（含直出核对清单） |
+| `07-cover.md` | 做封面（比例、横版裁切、直出核对清单） |
+| `07b-cover-brief.md` | **封面直出简报 V2.0**（六个设计维度 + 固定 DNA + 禁止项） |
 | `11-copywriting.md` | **写发布文案**（克制叙述法：讲事实不讲感受、平台字数、反例对照） |
 | `08-pitfalls.md` | 出问题先查这里（23 条实踩） |
 | `09-style-library.md` | 31 套风格，选风格时翻 |
@@ -342,6 +343,7 @@ python scripts/make_title.py --src images/plate.png --title "歌名" --singer "�
 python scripts/crop_watermark.py --src raw_title.mp4 --out clips/s01.mp4   # 先测后裁再复测
 python scripts/check_title.py --clip clips/s01.mp4 --layout overlay       # 六项验收
 python scripts/match_cut.py --a clips/s01.mp4 --b clips/s02.mp4 --outdir work/match  # 切点匹配
+python scripts/make_poster34.py --src images/s02.png --out cover/p1.png \n    --title "歌名" --artist "歌手 · 纸雕 MV" --style postcard
 python scripts/make_cover.py --src cover/base.png --title "歌名" --artist "歌手" \
     --ratio 3:4 --vertical --area x0,y0,x1,y1 --out cover/封面.png
 
