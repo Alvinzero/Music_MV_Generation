@@ -18,3 +18,6 @@ qa/
 *.ass
 sync_report.json
 score.json
+
+# 结果示例：只放行这一个短片段
+!docs/results/preview-30s.mp4
