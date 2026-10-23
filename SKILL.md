@@ -208,7 +208,23 @@ python scripts/align_subs.py --audio song.m4a --lines out/lines.json \
 ```
 
 **任何字偏差 >0.3s 就返回 2，不许静默过关**；C 级句子脚本会逐条列出，人工听那几句。
-详见 `references/04b-alignment.md`。
+
+**例外：能拿到官方 TTML（amll-ttml-db）就走逐字骨架，别用能量峰重排。**
+官方 TTML 是每字一个 span 的逐字标注，比任何能量峰估计都可靠：
+
+```bash
+python scripts/realign_ttml.py --audio out/stems/htdemucs/song/vocals.wav \
+    --ttml work/qrc/song.ttml --lines out/lines.json \
+    --out out/lines_sync.json --report out/sync_report.json
+```
+
+两条硬规则：
+- **先证同源**：用「逐句首尾字直接核对音轨强起音」确定偏移量，
+  **不要用命中计数扫偏移**（离散指标会被量化带偏，本次偏了 65ms）。
+- **验收用发声段**：字必须落在 F0 发声段内，落静音率 0 才算过。
+  `scripts/eval_timeline.py` 用这个判据做横向评测。
+
+详见 `references/04b-alignment.md` 第六之二节。
 
 ### ⑫ 质检 ══[关4]══
 
