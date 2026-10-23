@@ -119,10 +119,12 @@ references/
   06-title-card.md        片头（载体选择、背景/文字分层、六个坑、切点匹配）
   07-cover.md            封面（版式、直出核对）
 11-copywriting.md      **发布文案：克制叙述法**（讲事实不讲感受、平台字数）             封面（直出核对清单、版式标准）
-  08-pitfalls.md          27 条实踩的坑
+  08-pitfalls.md          29 条实踩的坑
   09-style-library.md     31 套视觉风格
+  07b-cover-brief.md      封面直出简报 V2.0（六维度 + 固定 DNA + 禁止项）
   10-remotion.md          可选后端
-scripts/                  26 个脚本（见下）
+  11-copywriting.md       发布文案：克制叙述法
+scripts/                  28 个脚本（见下）
 assets/fonts/             MV Serif SC（衬线）、站酷快乐体
 assets/*.example.json     lines.json / beats.json 的字段示例
 ```
@@ -139,6 +141,7 @@ assets/*.example.json     lines.json / beats.json 的字段示例
 | `subtitle_router.py` | 12 套字幕配方打分 |
 | `make_title.py` / `make_cover.py` | 片头排字（压字/纸带两种版式）、封面合成 |
 | `check_title.py` / `crop_watermark.py` | 片头验收（水印/时长/留白/居中）、一键裁水印并复测 |
+| `make_poster34.py` | 横版作品转 3:4 主页封面（模糊延展 / 纸卡明信片） |
 | `match_cut.py` | 切点匹配：改两侧出入口（A 尾巴加雾 / B 开头拉焦），帧数不动，亮度差收到 ≤4 |
 | `timeline.py` / `render_ffmpeg.py` / `quality_check.py` | 时间轴、渲染、质检 |
 
