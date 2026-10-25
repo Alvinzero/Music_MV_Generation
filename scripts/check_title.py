@@ -74,7 +74,7 @@ def wm_score(im, box, win=(170, 76), stride=8):
     sat = (mx - mn) / (mx + 1e-3)
     bg = np.asarray(Image.fromarray(lum.astype(np.uint8)).filter(
         ImageFilter.MedianFilter(size=17)), dtype=np.float32)
-    m = ((lum - bg) > 22) & (lum > 78) & (lum < 248) & (sat < 0.20)
+    m = ((lum - bg) > 5) & (lum > 78) & (lum < 252) & (sat < 0.30)
 
     H, W = m.shape
     ww, hh = min(win[0], W), min(win[1], H)

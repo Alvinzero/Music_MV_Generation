@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""成片质检：规格 / 响度 / 黑帧 / 冻结帧 / 字幕几何，一次跑完出 report.json。
+"""成片质检：规格 / 响度 / 黑帧 / 冻结帧 / 字幕几何 / 开头留存，一次跑完出 report.json。
 
     python quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs -14
     python quality_check.py out/final.mp4 --lines out/lines.json    # 顺带查字幕是否越界
 
 只做"能量化"的检查。镜头好不好看、剧情通不通，脚本管不了，必须人看。
+
+**开头留存检查是独立的一项，不受 --ignore-head 豁免影响。**
+黑帧检查默认豁免开头 1.6 秒（给淡入留余地），但首帧黑恰恰是信息流
+2 秒跳出的主因——必须单独查，不能跟着豁免。
+开头有没有钩子、是不是无聊的静止，不在自动判定内，抽 0s/1s/3s 人工看。
 """
 import argparse
 import json
@@ -97,6 +102,50 @@ def freeze_frames(path, dur):
     return segs
 
 
+def sample_frames(path, times, width=96):
+    """逐时刻抽帧，返回 {t: 灰度原始字节}，取不到帧则为 None。
+
+    缩到 96 宽再转灰度，一帧只有几千字节，直接算即可，不引第三方依赖。
+    """
+    out = {}
+    for t in times:
+        r = subprocess.run([FF, "-hide_banner", "-loglevel", "error",
+                            "-i", path, "-ss", "%.3f" % t, "-frames:v", "1",
+                            "-vf", "scale=%d:-2,format=gray" % width,
+                            "-f", "rawvideo", "-"], capture_output=True)
+        out[t] = r.stdout or None
+    return out
+
+
+def check_opening(path, first_min):
+    """开头留存检查：首帧亮度 + 首秒是否持续黑。
+
+    刻意不接收 ignore_head：黑帧检查豁免开头是给淡入留余地，
+    但首帧黑正是 2 秒跳出的主因，必须单独拦。
+
+    **只查亮度，不自动判「开头是否静止」。** 实测过：静态字牌的帧间像素差
+    （1.45–1.65）比正常慢推镜头（0.90–1.11）还高，因为纸面有纹理闪烁，
+    像素差分不出「无聊的静止」和「好看的慢推」。开头有没有钩子、动不动，
+    必须抽 0s/1s/3s 三帧人工看——见 references/06-title-card.md。
+    """
+    times = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+    frames = sample_frames(path, times)
+    lumas = {t: (sum(f) / len(f) if f else None) for t, f in frames.items()}
+    fails = []
+    first = lumas.get(0.0)
+    if first is not None and first < first_min:
+        fails.append("首帧平均亮度 %.1f < %.1f（观众第一眼是黑/近黑）"
+                     % (first, first_min))
+    head = [v for t, v in lumas.items() if t <= 1.0 and v is not None]
+    if len(head) >= 2 and max(head) < first_min:
+        fails.append("前 1 秒持续接近全黑（最高亮度 %.1f < %.1f）"
+                     % (max(head), first_min))
+    return {"luma": {str(t): (round(v, 2) if v is not None else None)
+                     for t, v in lumas.items()},
+            "first_frame_min": first_min,
+            "note": "开头是否有钩子/是否静止需抽 0s/1s/3s 人工核对，不在自动判定内"}, fails
+
+
 def check_caption_geometry(lines, width, height, safe_x=30, safe_top=8, safe_bottom=8):
     """用 lines.json 的 x/y/fs 估算纸卡外框，查是否越界 / 压到底边。"""
     problems = []
@@ -136,6 +185,10 @@ def main():
     ap.add_argument("--lines", help="lines.json，顺带查字幕几何")
     ap.add_argument("--ignore-head", dest="ignore_head", type=float, default=1.6)
     ap.add_argument("--ignore-tail", dest="ignore_tail", type=float, default=2.8)
+    ap.add_argument("--first-frame-min", dest="first_frame_min", type=float, default=25.0,
+                    help="首帧平均亮度下限（0–255），低于此值判不通过")
+    ap.add_argument("--skip-opening", dest="skip_opening", action="store_true",
+                    help="跳过开头留存检查（不推荐）")
     ap.add_argument("-o", "--out", default="out/report.json")
     a = ap.parse_args()
 
@@ -177,6 +230,12 @@ def main():
         warns.append("疑似卡住 %d 处（>2s 无变化，慢镜头可忽略）: %s"
                      % (len(freezes), freezes[:6]))
 
+    # 3.5) 开头留存（独立于 ignore-head 的黑帧豁免）
+    opening = None
+    if not a.skip_opening:
+        opening, ofails = check_opening(a.video, a.first_frame_min)
+        fails.extend(ofails)
+
     # 4) 字幕几何
     cap_prob = []
     if a.lines:
@@ -188,6 +247,7 @@ def main():
 
     report = {"video": a.video, "probe": info, "loudness": ld,
               "black_frames": blacks, "freeze_points": freezes,
+              "opening": opening,
               "caption_problems": cap_prob[:40],
               "fails": fails, "warnings": warns,
               "pass": not fails}
@@ -200,6 +260,11 @@ def main():
           % (ld.get("integrated_lufs", 0), ld.get("lra", 0), ld.get("true_peak_dbfs", 0)))
     print("  黑帧 %d 处  冻结 %d 处  字幕问题 %d 处"
           % (len(blacks), len(freezes), len(cap_prob)))
+    if opening:
+        print("  首帧亮度 %s（下限 %.0f）  开头亮度剖面 %s"
+              % (opening["luma"].get("0.0"), opening["first_frame_min"],
+                 [opening["luma"][k] for k in sorted(opening["luma"], key=float)]))
+        print("  注：开头是否有钩子需抽 0s/1s/3s 人工核对，不在自动判定内")
     for f in fails:
         print("  [不通过]", f)
     for w in warns:

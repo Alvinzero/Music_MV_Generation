@@ -30,6 +30,21 @@ python scripts/song_structure.py --audio song.m4a -o out/structure.json
 | s01 | 0.0–5.9 | 5.9 | — | 夜巷纸幡，歌名进场 | 片头 |
 | s08 | 44.7–48.6 | 3.9 | 固执的自转陀螺 | 陀螺在纸台面上高速旋转，顶光 | 陀螺 |
 
+### 面向抖音：分镜表先过双轨检查
+
+面向抖音时，分镜表必须同时带推流字段和生成字段，字段定义见 `references/13-douyin-storyboard.md`：
+
+- 推流：`traffic_role / audience_question / change_type / repeat_of / upgrade`
+- 生成：`visual / camera / continuity / image_prompt / motion_prompt / negative / backup_prompt / acceptance`
+
+```bash
+python scripts/narrative_lint.py out/shots.json                 # 关3后检查
+python scripts/narrative_lint.py out/shots.json --production    # 批量前检查
+```
+
+**不要把推流任务写进 prompt 让模型理解。** “提升留存”“钩子更强”是剪辑与叙事指令，
+生图模型不需要知道；prompt 只写能被画出来的主体、动作、环境、光、材质和构图。
+
 ---
 
 ## 二、场景图提示词：七段式
@@ -181,3 +196,14 @@ morphing, warping, melting, changing characters, extra text, watermark, logo
 | 整镜不好看 | 分镜本身有问题 | **换镜，不要修**——修一镜的时间够重做三镜 |
 
 **每一镜都必须有备选。** 没有备选的时候，你会不自觉地"凑合"，而凑合是成片质量的真实上限。
+
+### 抖音项目再加一项验收：首帧是否完成推流任务
+
+除主体、运镜、纹理、亮度外，回到 `traffic_role` 逐镜核对：
+
+- `hook`：首帧是否能看懂异常、目标或结果
+- `world`：是否补上了世界规则，而非只换了一个好看场景
+- `escalation/turn`：关系或后果是否真的发生变化
+- `payoff/comment`：是否形成情绪落点或具体讨论点
+
+首帧没完成任务的镜头，即使画面精美，也要换镜或重排，不得用“好看”抵消“无信息”。

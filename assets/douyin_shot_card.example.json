@@ -1,0 +1,53 @@
+[
+  {
+    "id": "s01",
+    "start": 0.0,
+    "end": 4.8,
+    "lyrics": "",
+    "traffic_role": "hook",
+    "audience_question": "纸做的校园会被雨毁掉吗？",
+    "change_type": "new_info",
+    "visual": "已建成的纸雕校园被第一滴纸雨击中，男孩和女孩被雨隔开",
+    "camera": "locked-off",
+    "continuity": "下一镜回到校园尚未遇雨的状态，保持同一建筑与角色位置",
+    "image_prompt": "16:9 wide cinematic papercraft diorama, a school campus made of layered cut paper, first paper raindrop hitting the roof, two small paper figures separated by rain, visible paper fibre, deckled edges, cool grey light with a muted brick-red accent, no text, no watermark",
+    "motion_prompt": "paper rain slowly becomes denser, roof paper edges begin to curl slightly, both figures remain still, camera locked, preserve the paper texture and composition",
+    "negative": "text, letters, watermark, logo, extra characters, hand close-up, melting paper, plastic texture",
+    "backup_prompt": "A paper book closing around a small paper flower, same palette and material, no text",
+    "acceptance": ["首帧能同时识别纸城、雨和两个人物", "末帧建筑与人物没有变形", "没有新增人物或画面文字"]
+  },
+  {
+    "id": "s02",
+    "start": 4.8,
+    "end": 9.6,
+    "lyrics": "",
+    "traffic_role": "world",
+    "audience_question": "这座校园为什么怕雨？",
+    "change_type": "new_info",
+    "visual": "镜头穿过纸层，展示教学楼、操场和纸树都由薄纸构成",
+    "camera": "slow lateral move",
+    "continuity": "沿用 s01 的校园和左右人物位置，雨尚未出现",
+    "image_prompt": "layered papercraft school campus, close view of paper teaching building, playground and paper trees, three visible depth layers, visible fibre and torn edges, warm cream palette, soft contact shadows, 16:9, no text, no watermark",
+    "motion_prompt": "camera drifts slowly sideways across the paper layers, only subtle paper leaf movement, no people added, preserve geometry and lighting",
+    "negative": "text, watermark, logo, rain, extra characters, warping, plastic texture",
+    "backup_prompt": "Macro view of layered paper walls and a cut-paper window, same campus identity",
+    "acceptance": ["能读出三层纸的厚度", "建筑结构没有变形", "与 s01 的角色位置一致"]
+  },
+  {
+    "id": "s03",
+    "start": 9.6,
+    "end": 14.0,
+    "lyrics": "",
+    "traffic_role": "goal",
+    "audience_question": "男孩想把这张纸递给谁？",
+    "change_type": "new_goal",
+    "visual": "男孩拿出一张折起的纸，看向走廊远处的女孩",
+    "camera": "slow push-in",
+    "continuity": "接 s02 的校园全景，转入同一走廊，女孩仍在右侧",
+    "image_prompt": "a paper boy with a muted brick-red scarf holding a folded sheet of paper, looking toward a paper girl far away in a layered paper school corridor, visible fibre and deckled edges, soft side light, 16:9, no readable text, no watermark",
+    "motion_prompt": "the boy lifts the folded paper slightly and looks down the corridor, camera pushes in very slightly, the girl remains distant and still, preserve character designs",
+    "negative": "text, letters, watermark, logo, extra fingers, extra characters, face morphing, plastic texture",
+    "backup_prompt": "Close-up of the folded paper held at chest level, no visible fingers, same corridor background",
+    "acceptance": ["观众能看出男孩有未递出的纸", "手部不作为特写主体", "两位角色外形保持一致"]
+  }
+]

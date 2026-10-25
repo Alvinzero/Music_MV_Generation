@@ -37,12 +37,13 @@ per-video subtitle language, and per-character lyric alignment.
 
 ---
 
-## 主流程：13 步，四道关
+## 主流程：四道关 + 发布后回流
 
 ```
-①素材分析 → ②风格选项 ═关1═ → ③样张 ═关2═ → ④剧情方案 → ⑤分镜表 ═关3═
-→ ⑥分镜提示词 → ⑦批量出图 → ⑧批量出视频 → ⑨片头 → ⑩时间轴/拼接
-→ ⑪字幕 → ⑫质检 ═关4═ → ⑬封面交付
+⓪平台目标与对标 → ①素材分析 → ②风格选项 ═关1═ → ③样张 ═关2═
+→ ④推流剧情方案 → ⑤双轨分镜表 ═关3═ → ⑥分镜提示词 → ⑦批量出图
+→ ⑧批量出视频 → ⑨片头 → ⑩时间轴/拼接 → ⑪字幕 → ⑫质检 ═关4═
+→ ⑬封面 + 发布文案 → ⑭数据复盘回流
 ```
 
 四道关都是**跟用户交互**，不是自己判断完就往下走：
@@ -56,7 +57,7 @@ per-video subtitle language, and per-character lyric alignment.
 
 ---
 
-## 四个不太常见的机制
+## 五个不太常见的机制
 
 ### 1. 三层打分 + 可生成性红线
 
@@ -101,33 +102,43 @@ python scripts/align_subs.py --audio song.m4a --lines out/lines.json \
   构图、字体、字色、标题位置、质感、禁止项全照它，没有第二套版式说法。
   `07-cover.md` 只负责图出来之后的裁水印、导出、自检。
 
+### 5. 抖音推流叙事与双轨分镜
+
+- `references/12-douyin-narrative.md`：平台目标、首帧、前奏、全曲留存、重复段升级、互动与系列化。
+- `references/13-douyin-storyboard.md`：每镜同时记录推流任务与生成执行，缺任务不进入批量。
+- `references/14-douyin-review.md`：发布后按最早大流失点做单一修改，再回流到下一首。
+- `narrative_lint.py`：检查单镜时长、首镜钩子、重复段升级、生产备选与验收字段。
+
 ---
 
 ## 仓库结构
 
 ```
-SKILL.md                  主体：13 步流程、四道关、硬规矩 15 条、交付清单
+SKILL.md                  主体：四道关 + 发布后回流、硬规矩、交付清单
 references/
   01-brief.md             素材分析 → 意象表 → 风格选项 → 样张迭代
   02-scoring.md           三层打分机制（权重、红线、淘汰规则、JSON 格式）
   03-generation.md        七段式提示词、批量出图、图生视频与逐镜验收
   04-assembly.md          时间轴、拼接、混音、渲染
-  04a-timeline.md         timeline.json 规范
+  04a-timeline.md         timeline.json 规范；前奏填充 / 最强镜前移 / 信息密度
   04b-alignment.md        字幕对齐（统一算法 + 0.3s 门槛）
   04c-ffmpeg.md           常用 ffmpeg 配方
   05-subtitles.md         字幕样式推导（七维度 + 八特征）
   05a-subtitle-layout.md  逐句落位、字号档、卡片像素级做法
   05b-subtitle-recipes.md 12 套字幕配方的完整参数
-  06-title-card.md        片头（载体选择、背景/文字分层、六个坑、切点匹配）
+  06-title-card.md        片头（第〇节：片头=交付第 0–3 秒；载体、分层、六个坑、切点匹配）
   07b-cover-brief.md      **封面唯一依据**：抖音系列封面标准化生图提示词 V2.0
   07-cover.md             封面出图之后：裁水印 / 导出 / 自检（不含设计规则）
   08-pitfalls.md          29 条实踩的坑
   09-style-library.md     31 套视觉风格
   10-remotion.md          可选后端
-  11-copywriting.md       发布文案：克制叙述法
-scripts/                  35 个脚本（见下）
+  11-copywriting.md       发布文案：克制叙述法 + 具体评论问题
+  12-douyin-narrative.md  抖音推流叙事：平台目标、首帧、前奏、留存与系列化
+  13-douyin-storyboard.md 双轨分镜卡：推流任务 + 生成执行
+  14-douyin-review.md     发布后数据复盘：分段流失归因与结论回流
+scripts/                  36 个脚本（见下）
 assets/fonts/             MV Serif SC（衬线）、站酷快乐体
-assets/*.example.json     lines.json / beats.json 的字段示例
+assets/*.example.json     lines.json / beats.json / 抖音分镜与评分示例
 ```
 
 常用脚本：
@@ -136,7 +147,8 @@ assets/*.example.json     lines.json / beats.json 的字段示例
 |---|---|
 | `mediainfo.py` / `song_structure.py` / `beat_sync.py` | 素材体检、曲式与镜数、拍点 |
 | `style_advisor.py` | 31 套风格里出候选 |
-| `score_candidates.py` | 按权重算候选分、标红线、排序 |
+| `score_candidates.py` | 按权重算候选分、标红线、排序；`--layer douyin` 检查推流剧情证据 |
+| `narrative_lint.py` | 抖音分镜检查：时长、首镜钩子、重复段升级、生产备选与验收 |
 | `align_subs.py` / `align_core.py` | 统一对齐 + 逐字校对（0.3s 门槛） |
 | `realign_ttml.py` / `realign_mid.py` | 有官方 TTML 时走逐字骨架；音频特征（F0 发声段 / 强起音） |
 | `eval_timeline.py` | 时间轴横向评测（用发声段做硬真值，落静音率 / 跨静音处数） |
@@ -179,6 +191,12 @@ python scripts/align_subs.py --audio song.m4a --lines out/lines.json \
     --out out/lines_sync.json --max-err 0.30 --strict
 ```
 
+抖音项目在进入批量前再加一道分镜检查：
+
+```bash
+python scripts/narrative_lint.py out/shots.json --production
+```
+
 ---
 
 ## 实测数据
@@ -188,7 +206,7 @@ python scripts/align_subs.py --audio song.m4a --lines out/lines.json \
 | 单镜成本 | ≈93 credits（图 8 + 6 秒视频 85） |
 | 40 镜全片 | ≈3700 credits / 2–4 小时 |
 | 字幕对齐（36 句 / 278 字） | 中位偏差 0.038s、p95 0.268s、最大 0.384s |
-| 质检项 | 规格 / 响度 / 黑帧 / 冻结帧 / 字幕越界，五项全过 |
+| 质检项 | 规格 / 响度 / 黑帧 / 冻结帧 / 字幕越界 / 首帧亮度，六项全过 |
 
 ---
 

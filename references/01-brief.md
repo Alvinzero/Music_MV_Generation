@@ -5,6 +5,24 @@
 
 ---
 
+## 〇、先定平台目标与对标（面向抖音）
+
+在分析音频之前，先写 `out/douyin_brief.md`，不要先想“这首歌配什么风景”。
+
+| 项目 | 必须写清 |
+|---|---|
+| 目标观众 | 歌迷、青春回忆、纸雕手作、泛情绪人群，选主受众 |
+| 主目标 | 冷启动播放、涨粉、收藏、系列回访，只选一个 |
+| 正片形态 | 完整原曲正片或独立预告，不共用同一完播率标准 |
+| 系列任务 | 本期要留下的视觉符号、栏目识别或下一期期待 |
+
+随后提取 3–5 个同形态样本的**结构参数**：首帧、前 3 秒冲突、有效变化点、重复段处理、评论话题。
+参考的是“为什么能留住人”，不是把别人的场景和文案搬进本片。没有真实样本就写“未做对标”。
+
+详细规则见 `references/12-douyin-narrative.md`。
+
+---
+
 ## 一、先盘点输入
 
 | 输入 | 必给 | 怎么用 |
@@ -24,6 +42,8 @@ python scripts/beat_sync.py song.m4a -o out/beats.json
 
 `song_structure.py` 会给：段落（主歌/预副歌/副歌/桥/尾）、BPM、每段强度、
 建议单镜时长与镜数、**预估工期**。先把工期报给用户，别闷头开工。
+面向抖音时，`structure.json` 还会附带 `douyin.change_checkpoints_sec`（首帧、段落边界、每 25 秒检查点），
+这些只是音频结构检查点，不能替代每镜的推流任务。
 
 ---
 
@@ -56,7 +76,7 @@ ffmpeg -copyts -ss 12 -i ref.mp4 -frames:v 1 out/ref_sub.png
 这是整条链路最容易被跳过、也最值钱的一步。**每一句歌词都要能落成一个可拍的东西**，
 落不成的句子，就是最后成片里"配了一张风景图"的地方——也是观众划走的地方。
 
-做法：逐句问四个问题，填成表。
+做法：逐句问四个问题，填成表。面向抖音时再补两格：**推流任务**和**观众疑问**。
 
 | 歌词 | 物件 | 空间 | 动作 | 光 |
 |---|---|---|---|---|
@@ -70,7 +90,10 @@ ffmpeg -copyts -ss 12 -i ref.mp4 -frames:v 1 out/ref_sub.png
   "object": "paper spinning top",
   "space": "empty tabletop, dark room",
   "action": "spinning fast, slowly losing balance",
-  "light": "single beam from above"
+  "light": "single beam from above",
+  "traffic_role": "escalation",
+  "audience_question": "陀螺什么时候会倒？",
+  "change_type": "new_consequence"
 }
 ```
 
@@ -175,6 +198,7 @@ PY
 
 ```
 out/
+  douyin_brief.md  平台目标 + 对标结构 + 本片留存任务（面向抖音时必填）
   brief.md          素材分析 + 参考片参数 + 意象表
   structure.json    段落/镜数/预估工期
   beats.json        拍点

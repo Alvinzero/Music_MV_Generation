@@ -26,6 +26,13 @@ import sys
 
 VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
 
+# 抖音双轨分镜字段：只在 cuts -> timeline 时透传，不参与帧数计算
+NARRATIVE_KEYS = (
+    "lyrics", "traffic_role", "audience_question", "change_type", "visual",
+    "camera", "continuity", "image_prompt", "motion_prompt", "negative",
+    "backup_prompt", "acceptance", "repeat_of", "upgrade",
+)
+
 
 def sec2f(t, fps):
     return int(round(float(t) * fps))
@@ -102,6 +109,9 @@ def build_from_cuts(cuts, fps, fade_frames, slot_mode=True, src_dur=None):
         seg = {"id": c.get("id") or "s%02d" % (k + 1), "file": c["file"],
                "in_frame": a, "out_frame": out_b, "speed": speed,
                "start_frame": int(c["start_frame"]) if "start_frame" in c else cursor}
+        for key in NARRATIVE_KEYS:
+            if key in c:
+                seg[key] = c[key]
         if k > 0 and c.get("xfade", True):
             seg["xfade"] = {"type": c.get("xfade_type", "fade"),
                             "frames": int(c.get("xfade_frames", fade_frames))}

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "song": "晴天",
+  "douyin": {
+    "candidates": [
+      {
+        "id": "A",
+        "scores": {"hook": 4.5, "retention": 4.0, "lyrics": 4.5, "feasible": 4.0, "arc": 4.0, "interaction": 4.0, "series": 4.5, "editable": 4.0},
+        "evidence": "首帧纸城遇雨，纸城怕雨与歌词中的雨和距离直接相关",
+        "hook_evidence": "0-3秒同时给出纸城、纸雨和被隔开的两个人",
+        "retention_beats": ["0-3秒世界异常", "28秒前建立纸城怕雨", "副歌第一次分离", "第二遍女孩视角", "尾段合书"],
+        "interaction_hook": "你会等待，还是离开？",
+        "series_marker": "纸雕金曲期数 + 小黄花视觉锚点",
+        "red_lines": []
+      },
+      {
+        "id": "B",
+        "scores": {"hook": 3.0, "retention": 3.0, "lyrics": 4.0, "feasible": 4.5, "arc": 3.0, "interaction": 2.5, "series": 4.0, "editable": 4.0},
+        "evidence": "以建城过程开场，画面稳定但首帧冲突不足",
+        "hook_evidence": "前3秒只有纸纤维与折痕",
+        "retention_beats": ["建城", "教室", "下雨", "告别"],
+        "interaction_hook": "你觉得好看吗？",
+        "series_marker": "纸雕风格统一",
+        "red_lines": []
+      }
+    ]
+  }
+}

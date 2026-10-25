@@ -184,6 +184,8 @@ def main():
     ap.add_argument("--zoom", type=float, default=1.07, help="推镜终点倍率")
     ap.add_argument("--crf", type=int, default=16)
     ap.add_argument("--no-video", action="store_true")
+    ap.add_argument("--text-layer", action="store_true",
+                    help="保留 RGBA 透明通道，供动态背景静态 overlay")
     ap.add_argument("--vertical", action="store_true",
                     help="竖排（纸幡/竖招牌）；必须配 --area，会自动留出上下边距")
     ap.add_argument("--area", default="",
@@ -221,7 +223,9 @@ def main():
     if not a.no_line:
         d.line([((W - 96) / 2, line_y), ((W + 96) / 2, line_y)], fill=(96, 72, 52, 150), width=2)
 
-    out = Image.alpha_composite(base, layer).convert("RGB")
+    out = Image.alpha_composite(base, layer)
+    if not a.text_layer:
+        out = out.convert("RGB")
     out.save(a.still)
 
     m = bbox_by_ink(a.still, ink)

@@ -21,6 +21,9 @@ WEIGHTS = {
                "purity": 0.10, "distinct": 0.10, "editable": 0.10},
     "shot": {"subject": 0.20, "feasible": 0.20, "lyrics": 0.15,
              "composition": 0.15, "light": 0.15, "contrast": 0.15},
+    "douyin": {"hook": 0.25, "retention": 0.20, "lyrics": 0.15,
+               "feasible": 0.15, "arc": 0.10, "interaction": 0.05,
+               "series": 0.05, "editable": 0.05},
 }
 
 # 可生成性红线：命中就扣分（不是判死，但基本赢不了）
@@ -40,7 +43,8 @@ CN = {
     "hook": "钩子", "lyrics": "歌词咬合", "feasible": "可生成性",
     "arc": "情绪曲线", "purity": "风格纯度", "editable": "可剪辑性",
     "subject": "主体明确", "composition": "构图可读", "light": "光与色",
-    "contrast": "前后对比",
+    "contrast": "前后对比", "retention": "留存曲线", "interaction": "互动",
+    "series": "系列识别",
 }
 
 
@@ -74,6 +78,21 @@ def check_layer(items, layer, name):
             issues.append("%s/%s 没写证据（只给数字不算评过）" % (name, cid))
         if c.get("red_lines") and final >= 4.0:
             issues.append("%s/%s 踩了红线还给了 %.2f 分，复核一下" % (name, cid, final))
+        if layer == "douyin":
+            required = {
+                "hook_evidence": "首帧钩子证据",
+                "retention_beats": "留存变化点",
+                "interaction_hook": "唯一评论问题",
+                "series_marker": "系列识别物",
+            }
+            for key, label in required.items():
+                if not c.get(key):
+                    issues.append("%s/%s 缺少%s（%s）" % (name, cid, label, key))
+            beats = c.get("retention_beats") or []
+            if len(beats) < 4:
+                issues.append("%s/%s 留存变化点少于 4 个" % (name, cid))
+            if c.get("veto"):
+                issues.append("%s/%s 命中抖音否决项：%s" % (name, cid, "、".join(c["veto"])))
         rows.append(dict(id=cid, raw=raw, final=final, pen=pen,
                          red=c.get("red_lines") or [], evidence=c.get("evidence", "")))
 
@@ -90,7 +109,7 @@ def check_layer(items, layer, name):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("score_json")
-    ap.add_argument("--layer", default="shot", choices=["style", "script", "shot"])
+    ap.add_argument("--layer", default="shot", choices=["style", "script", "shot", "douyin"])
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
 
@@ -109,6 +128,13 @@ def main():
         rows, iss = check_layer(data.get("script", {}).get("candidates", []), "script", "script")
         for r in rows:
             r["shot"] = "script"
+        out.extend(rows)
+        issues.extend(iss)
+        group_key = "shot"
+    elif a.layer == "douyin":
+        rows, iss = check_layer(data.get("douyin", data.get("script", {})).get("candidates", []), "douyin", "douyin")
+        for r in rows:
+            r["shot"] = "douyin"
         out.extend(rows)
         issues.extend(iss)
         group_key = "shot"

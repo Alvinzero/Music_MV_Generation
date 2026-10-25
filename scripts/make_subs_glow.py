@@ -157,10 +157,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 def emit(out, it, sheet, scale, glow_fixed, shadow_max):
     text = it["text"]
     n = len(text)
+    visible_n = sum(1 for ch in text if not ch.isspace())
     times = it.get("times") or []
-    if len(times) != n:
-        step = (it["end"] - it["start"]) / max(1, n)
-        times = [it["start"] + i * step for i in range(n)]
+    if len(times) != visible_n:
+        step = (it["end"] - it["start"]) / max(1, visible_n)
+        times = [it["start"] + i * step for i in range(visible_n)]
     fs = int(round(int(it.get("fs", 64)) * scale))
     cx = float(it.get("x", 960))
     cy = float(it.get("y", 900))
@@ -189,13 +190,18 @@ def emit(out, it, sheet, scale, glow_fixed, shadow_max):
         widths.append((f, f + (int(round(f * 0.08)) if i < n - 1 else 0)))
     x = cx - sum(w for _, w in widths) / 2
 
+    visible_i = 0
     for i, ch in enumerate(text):
         f, w = widths[i]
-        t_on = times[i]
-        t_end = max(it["end"] + 0.30, t_on + 0.6)   # 整句一起收，已亮的字保持到句末
+        if ch.isspace():
+            x += w
+            continue
+        t_on = times[visible_i]
+        t_end = max(it["end"] + 0.30, t_on + float(it.get("min_char_hold", 0.6)))   # 整句一起收，已亮的字保持到句末
         px, py = x + w / 2, cy
         x += w
-        is_acc = (i == accent)
+        is_acc = (visible_i == accent)
+        visible_i += 1
 
         # 辉光层：更大更糊，只负责"光"（配方没有 glow 就整层跳过）
         if RCP["glow"] is not None:

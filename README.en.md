@@ -17,22 +17,22 @@ burn per-character-synced lyrics, then ship a cover and a QC-checked MP4.
 ## What it is
 
 An **agent skill**, not a double-clickable app. `SKILL.md` is the workflow an AI agent follows;
-`references/` holds the per-stage playbooks (16 files); `scripts/` holds 35 runnable tools.
+`references/` holds the per-stage playbooks (20 files); `scripts/` holds 36 runnable tools.
 The division of labour is deliberate:
 
 - **The model decides; the tools measure.** Timing, specs and loudness are always measured,
   never estimated by the model.
 - **Generate many, keep few.** Every key choice has candidates, a score and an explicit cut.
 
-## How it works — 13 steps, 4 human gates
+## How it works — 4 human gates + post-publish feedback
 
 ```
-①analyse → ②style options ═gate 1═ → ③test frames ═gate 2═ → ④story → ⑤shot list ═gate 3═
-→ ⑥prompts → ⑦stills → ⑧clips → ⑨title card → ⑩timeline → ⑪subtitles ═gate 4═
-→ ⑫QC → ⑬cover
+⓪platform goal & references → ①analyse → ②style options ═gate 1═ → ③test frames ═gate 2═
+→ ④retention-led story → ⑤dual-track shot list ═gate 3═ → ⑥prompts → ⑦stills → ⑧clips
+→ ⑨title card → ⑩timeline → ⑪subtitles ═gate 4═ → ⑫QC → ⑬cover & copy → ⑭review
 ```
 
-Four mechanisms that make the output look intentional rather than generated:
+Five mechanisms that make the output look intentional rather than generated:
 
 1. **Three-layer scoring** (style / story / single shot) with hard red lines, e.g. a shot that
    cannot be generated from a still is rejected before any credit is spent.
@@ -44,6 +44,9 @@ Four mechanisms that make the output look intentional rather than generated:
    physical carrier in the scene (paper banner, shop sign), so they bend with the artwork.
    Covers follow `references/07b-cover-brief.md` only — it is the single source of truth for
    cover design and prompting.
+5. **Douyin narrative and review** — `12-douyin-narrative.md` defines hooks, retention and series identity;
+   `13-douyin-storyboard.md` defines dual-track shot cards; `14-douyin-review.md` closes the loop after publishing.
+   `narrative_lint.py` checks shot duration, opening hooks, repeated-section upgrades, backups and acceptance fields.
 
 ## Requirements
 
@@ -79,7 +82,7 @@ python scripts/make_subs.py --lines out/lines_sync.json --style auto --out out/s
 | Cost per shot | ≈93 credits (1 still + 6 s clip) |
 | 40-shot film | ≈3,700 credits, 2–4 h wall clock |
 | Lyric alignment (36 lines / 278 chars) | median 0.038 s, p95 0.268 s, max 0.384 s |
-| QC | specs / loudness / black frames / frozen frames / subtitle overflow — all five must pass |
+| QC | specs / loudness / black frames / frozen frames / subtitle overflow / first-frame luma — all six must pass |
 | Films produced with it | 3:29 and 4:52, 1080p24, −14 LUFS |
 
 ## Limitations
@@ -96,8 +99,8 @@ python scripts/make_subs.py --lines out/lines_sync.json --style auto --out out/s
 
 ```
 SKILL.md          the workflow (what the agent reads)
-references/       16 playbooks: scoring, subtitle styles, title cards, pitfalls…
-scripts/          35 tools: timeline, align, subtitles, render, QC, cover…
+references/       20 playbooks: scoring, subtitle styles, title cards, pitfalls…
+scripts/          36 tools: timeline, align, subtitles, render, QC, cover…
 assets/           fonts and example briefs
 docs/results/     the samples above
 ```

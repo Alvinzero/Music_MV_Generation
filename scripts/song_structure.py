@@ -114,6 +114,24 @@ def label_sections(bounds, rms, fps):
     return out
 
 
+def douyin_checkpoints(secs, dur):
+    """只按音频结构给出留存检查点，不代替剧情判断。
+
+    包含首帧 0s、3s、段落边界和每 25s 检查点，供双轨分镜安排有效变化。
+    """
+    marks = {0.0, 3.0}
+    for s in secs:
+        if s["label"] == "intro" and s["end"] < dur:
+            marks.add(float(s["end"]))
+        else:
+            marks.add(float(s["start"]))
+    t = 25.0
+    while t < dur:
+        marks.add(t)
+        t += 25.0
+    return [round(x, 2) for x in sorted(marks) if x <= dur]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--audio", required=True)
@@ -166,10 +184,17 @@ def main():
           % (total_shots, total_shots * COST_PER_SHOT, COST_PER_SHOT))
 
     if a.out:
+        douyin = {
+            "hook_window_sec": [0.0, 3.0],
+            "change_checkpoints_sec": douyin_checkpoints(plan, dur),
+            "max_change_gap_sec": 25.0,
+            "note": "检查点只来自音频结构；每点放什么推流任务由双轨分镜决定",
+        }
         with open(a.out, "w", encoding="utf-8") as f:
             json.dump(dict(duration=round(dur, 2), sections=plan,
                            total_shots=total_shots,
-                           est_credits=total_shots * COST_PER_SHOT),
+                           est_credits=total_shots * COST_PER_SHOT,
+                           douyin=douyin),
                       f, ensure_ascii=False, indent=1)
         print("已写入:", a.out)
 
