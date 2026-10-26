@@ -139,15 +139,17 @@ references/
   12-douyin-narrative.md  抖音推流叙事：平台目标、首帧、前奏、留存与系列化
   13-douyin-storyboard.md 双轨分镜卡：推流任务 + 生成执行
   14-douyin-review.md     发布后数据复盘：分段流失归因与结论回流
-scripts/                  36 个脚本（见下）
+  15-media-api.md         第三方生成网关：配置、模型参数、首帧 URL、费用与错误处理
+scripts/                  37 个脚本（见下）
 assets/fonts/             MV Serif SC（衬线）、站酷快乐体
-assets/*.example.json     lines.json / beats.json / 抖音分镜与评分示例
+assets/*.example.json     lines.json / beats.json / 抖音分镜与评分示例 / 网关配置模板
 ```
 
 常用脚本：
 
 | 脚本 | 干什么 |
 |---|---|
+| `media_api.py` | 第三方生成网关：文生图 / 图生图 / 视频提交轮询下载、批量清单与断点续跑、credit 汇总 |
 | `mediainfo.py` / `song_structure.py` / `beat_sync.py` | 素材体检、曲式与镜数、拍点 |
 | `style_advisor.py` | 31 套风格里出候选 |
 | `score_candidates.py` | 按权重算候选分、标红线、排序；`--layer douyin` 检查推流剧情证据 |
@@ -206,14 +208,19 @@ python scripts/narrative_lint.py out/shots.json --production
 
 | 项 | 数字 |
 |---|---|
-| 单镜成本 | ≈93 credits（图 8 + 6 秒视频 85） |
-| 40 镜全片 | ≈3700 credits / 2–4 小时 |
+| 单镜成本（旧内置工具实测） | ≈93 credits（图 8 + 6 秒视频 85） |
+| 单镜成本（第三方网关，按手册样本外推） | 图 ≈5.71 + 6 秒视频：MiniMax 768P ≈86 / Kling 720P ≈103，1080P 更高 |
+| 全片工期 | 2–4 小时（含重试）；网关视频为异步任务，可并发等待 |
 | 字幕对齐（36 句 / 278 字） | 中位偏差 0.038s、p95 0.268s、最大 0.384s |
 | 质检项 | 规格 / 响度 / 黑帧 / 冻结帧 / 字幕越界 / 首帧亮度，六项全过 |
+
+> 网关费用以任务完成响应里的 `credit` 为准，批量结束会自动汇总。详见 `references/15-media-api.md`。
 
 ---
 
 ## 说明
 
-这个仓库是工作流本身，不含任何歌曲、素材或成片。实际生成依赖 ImageGen / VideoGen 等外部能力，
-脚本只负责"把参数算准、把时间对齐、把片子拼对"。
+这个仓库是工作流本身，不含任何歌曲、素材或成片。
+**实际生成走第三方媒体网关**（`scripts/media_api.py`：混元文生图 / 图生图，Kling / MiniMax 视频），
+不再依赖内置 ImageGen / VideoGen；配置方法见 `references/15-media-api.md`。
+其余脚本负责"把参数算准、把时间对齐、把片子拼对"。

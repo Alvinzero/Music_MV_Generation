@@ -5,6 +5,11 @@
 这份文档只讲片头：歌名、歌手、载体、怎么动起来、怎么验收。
 字幕的正片样式归 `subtitle-styles.md`，这里不重复。
 
+> **生成入口已换**：下文的 ImageGen = `media_api.py image`（`hunyuan-image-alpha`，片头场景用 `1920x1080`），
+> VideoGen = `media_api.py video`（默认 `kling-video-v3` + `1080P` + `enable_audio=false` + `watermark=false`）。
+> 配置与参数见 `references/15-media-api.md`；图生视频首帧必须是公网 URL。
+> 文中水印坐标是**旧内置工具**的实测记录，新接口不能照抄——先测 bbox 再决定裁不裁。
+
 ---
 
 ## 〇、先记住：片头就是交付文件的第 0–3 秒（2026-10-26 数据回流）
@@ -198,7 +203,7 @@ ffmpeg -y -i out/title_v2.mp4 -i out/base.mp4 -filter_complex \
 
 ## 三、三段式：出无字场景 → 排字 → 让它动
 
-### ① ImageGen 出**场景**（不是"一块广告牌"）
+### ① 文生图出**场景**（`media_api.py image`）（不是"一块广告牌"）
 
 **别再写 `a blank signboard filling 60% of the frame width`** —— 这句话就是在生成"一张纸"，
 生成出来必然单调。要写的是**一个有故事的空间**，并给它留出安静区。
@@ -310,14 +315,14 @@ python scripts/make_title.py --src images/plate.png --title "无人知晓的我"
 > 正确做法是**把背景和文字分开**：
 >
 > ```
-> ImageGen 出无字场景 → VideoGen 只让这个场景动 → crop_watermark 裁水印
+> 文生图出无字场景 → 图生视频只让这个场景动 → crop_watermark 裁水印（先测 bbox）
 > → PIL 画静态文字层（同名衬线、同字号字距）→ ffmpeg overlay 合成 N 帧
 > ```
 >
 > 这样字**由构造保证不动**（一张 PNG 盖 N 帧），画面又有真实环境运动。
 > 实测同一个镜头：背景机位 6 秒只漂 1.6px（锁机位成立），画面帧差 1.4–3.8（全程有动）。
 
-**推荐：VideoGen 图生视频**（纸边会颤、灰会飘、窗光会闪，字在第一帧里烫死，不会错）。
+**推荐：`media_api.py video` 图生视频**（纸边会颤、灰会飘、窗光会闪，字在第一帧里烫死，不会错）。
 
 ```
 image      : out/title_still.png
@@ -333,7 +338,7 @@ negative   : zoom in, push in, dolly in, camera movement, warped text,
 **备选：zoompan 推镜**（最稳，但只有推，没有环境感）：
 `zoompan 1.00 → 1.07 / 125 帧`，锚点放在载体中心。
 
-> **什么时候放弃 VideoGen**：抽首末帧发现字被推歪、笔画糊掉、或者载体变形——
+> **什么时候放弃图生视频**：抽首末帧发现字被推歪、笔画糊掉、或者载体变形——
 > 直接退回 zoompan。宁可少一点"环境感"，也不能让歌名在动的时候发抖。
 
 > **片头留 5–6 秒。** 六个竖排字 + 署名，少于 4 秒读不完；超过 7 秒观众会开始等。
@@ -412,7 +417,7 @@ python scripts/match_cut.py --a work/s01.mp4 --b work/s02.mp4 --outdir work/matc
 
 ---
 
-## 四、VideoGen 这条路的六个坑（都是实测）
+## 四、图生视频这条路的六个坑（旧内置工具实测，思路仍适用）
 
 ### 坑 1：写 "slow push-in" 它会推过头
 
@@ -551,7 +556,7 @@ python scripts/check_title.py --clip clips/s01.mp4 --layout overlay
 | 症状 | 处理 |
 |---|---|
 | 水印还在 | 回到坑 2：按检测出的 bbox 重裁 → 复测 |
-| 首字贴边 / 占比不对 | 重跑 `make_title.py --vertical`（会强制留白）；还不行说明载体太小，回 ImageGen 把纸幡生成得更高 |
+| 首字贴边 / 占比不对 | 重跑 `make_title.py --vertical`（会强制留白）；还不行说明载体太小，回文生图把纸幡生成得更高 |
 | 字被推歪、笔画糊、载体变形 | 换 `locked-off` 提示词重生成视频；仍不行退 zoompan |
 | 时长不对 | 改 `-frames:v N` 重出 |
 | 字错 / 多出物料 / 主体跑了 | 底图重生成，重新排字 |

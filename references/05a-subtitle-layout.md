@@ -486,7 +486,16 @@ ffmpeg -i still.png -vf "scale=3840:2160,\
 
 **③-b 图生视频（纸页会摆、鸽子会飞，但要多一道裁切）**
 
-把 `still.png` 喂给 VideoGen 做 image-to-video，`last_image` 传同一张，
+把 `still.png` 通过 `media_api.py video` 做图生视频（首帧要公网 URL，见 `15-media-api.md`），
+`--last-frame` 传同一张（给了尾帧必须同时给首帧）：
+
+```bash
+python scripts/media_api.py video --first-frame <still.png 的 URL> --last-frame <同一张> \
+    --prompt "the banner and every character printed on it must stay perfectly sharp, flat, stable and completely unchanged" \
+    --negative-prompt "warped text, changed characters, rippling paper" \
+    --seconds 6 --out clips/s01.mp4
+```
+
 prompt 反复强调 "the banner and every character printed on it must stay perfectly
 sharp, flat, stable and completely unchanged"，negative 挂 `warped text`,
 `changed characters`, `rippling paper`。

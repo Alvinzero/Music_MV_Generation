@@ -1,5 +1,9 @@
 # 第三步：提示词与批量生成（图 → 视频）
 
+> **生成入口已换成第三方媒体网关**，一律用 `scripts/media_api.py` 调用，
+> 不再使用内置 ImageGen / VideoGen。地址、Key、模型参数、首帧公网 URL、费用与错误处理
+> 全部见 `references/15-media-api.md`（动手前必读）。本文只管提示词和验收。
+
 这一步把"意象表"变成画面。分两段：先出**场景图**，再由场景图出**视频**。
 每段都有固定的提示词结构，照结构写，别自由发挥。
 
@@ -94,26 +98,35 @@ negative: text, letters, watermark, logo, extra limbs, photorealism, 3d render
 
 ### 并发怎么发
 
-一次并发 **4–8 个** ImageGen 调用（不是 40 个）。原因：
-- 太多会互相覆盖（见 `08-pitfalls.md` 第 1 条，同名前缀丢过素材）
+用脚本自带的批量入口，**并发 4–8**（默认 4，不要开到 40）。原因：
+- 上游会限流（429），并发越高越容易触发，而且限流时不许并发重试
 - 分批出完就能分批检查，早发现风格跑偏
 
+```bash
+python scripts/media_api.py jobs --kind image --shots out/shots.json \
+    --out-dir images --size 1920x1080 --out work/image_jobs.json
+python scripts/media_api.py batch --jobs work/image_jobs.json --concurrency 4
+```
+
 **每条提示词用唯一前缀**：`s07a_`、`s07b_`（镜号 + 候选号）。产物落进 `generated-images/`，
-再按镜号归到 `images/s07.png`。
+再按镜号归到 `images/s07.png`。已完成项会自动跳过，失败项改完提示词重跑同一条命令即可。
 
 ### 出图参数
 
 | 项目 | 值 | 说明 |
 |---|---|---|
-| 尺寸 | `1536×1024`（16:9）/ `1024×1536`（3:4） | 按成片比例，别出方图再裁 |
-| 质量 | high | — |
-| 张数 | 每镜 1 张 | 候选靠"多条提示词"，不是"一条出多张" |
+| 模型 | `hunyuan-image-alpha` | 局部修改用 `hunyuan-image-alpha-edit`（`edit` 子命令） |
+| 尺寸 | `1920x1080`（16:9）/ `1024x1536`（3:4 封面） | 原生比例，别出方图再裁；总像素 ≤ 420 万 |
+| 张数 | 每镜 1 张（`n` 只能为 1） | 候选靠"多条提示词"，不是"一条出多张" |
+| 取结果 | `data.data[0].url` | 签名 URL 会过期，脚本已自动立刻下载 |
 
 ### 出图后必做的三件事
 
-1. **裁水印**：ImageGen 在**右下角**，16:9 裁 `crop=1755:987:0:0`，3:4 裁 `crop=0,0,1024,1365`
+1. **先检测水印再裁**：新接口的水印位置不能套旧内置工具的坐标（旧的右下角 `1755:987:0:0`
+   只属于 ImageGen）。用 `crop_watermark.py` 先测 bbox、再裁、再复测；没水印就别裁。
 2. **人工筛**：主体完整吗？有没有多余肢体？有没有蹦出文字？构图和分镜表一致吗？
-3. **不合格换备选**，不要"凑合着用"——一帧凑合，整段视频都跟着凑合
+3. **不合格换备选**，不要"凑合着用"——一帧凑合，整段视频都跟着凑合。
+   只是局部脏（水印、杂物、多一只手）可以走 `edit` 局部修，不必整张重出。
 
 ### 出完直接进图生视频（不问）
 
@@ -125,8 +138,16 @@ negative: text, letters, watermark, logo, extra limbs, photorealism, 3d render
 
 ## 四、图生视频
 
-**进入本节的唯一条件**：场景图已就绪 + 关2 样张已确认 + 关3 分镜已定。
-三条都满足就直接跑，不设"征询开始"这一步。全片每镜都走这条链，**不用静帧推拉凑镜**。
+**进入本节的条件**：场景图已就绪 + 关2 样张已确认 + 关3 分镜已定 + **首帧已是公网 URL
+（或配好 `MV_MEDIA_UPLOAD_CMD` 上传钩子）**。图生视频只接受 http(s) URL，不接受本地路径或 data URL。
+条件齐了就直接跑，不设"征询开始"这一步。全片每镜都走这条链，**不用静帧推拉凑镜**。
+
+```bash
+python scripts/media_api.py jobs --shots out/shots.json \
+    --images-dir images --out-dir clips_raw --out work/video_jobs.json
+python scripts/media_api.py batch --jobs work/video_jobs.json --concurrency 4
+# 中断/超时：wait 续等或重跑 batch，**不要重新提交**
+```
 
 ### 批量之后：逐镜抽首末帧，四件事一眼过
 
@@ -174,10 +195,18 @@ ffmpeg -y -sseof -0.1 -i clips/s07.mp4 -frames:v 1 /tmp/b.png
 ### 参数
 
 ```
-seconds    : 6        （单片上限 6.04s）
-resolution : 1080P
-audio      : false    （歌曲独立混音，不要生成音）
+model        : kling-video-v3   （省钱档 minimax-video-h3，但只有 768P/2K 且音轨关不净）
+seconds      : 6                （Kling 3–15 / MiniMax 4–15；默认仍按分镜节奏 ≤6s）
+resolution   : 1080P            （MiniMax 只能 768P 或 2K）
+enable_audio : false            （歌曲独立混音，不要生成音）
+watermark    : false            （网关默认 true，必须显式关）
+aspect_ratio : 16:9             （仅文生视频；图生视频幅面由首帧决定）
+image_url    : 首帧公网 URL      （可再加 last_image_url 作尾帧，给了尾帧必须给首帧）
 ```
+
+视频是异步任务：提交 → 每 5 秒轮询 → 完成立刻下载。
+**提交不自动重试**；502 `submission_uncertain` / `missing_task_id` 时先查任务与积分，
+续等用 `wait`，重跑用 `batch`（已完成自动跳过）。
 
 ### 三个固定 negative
 

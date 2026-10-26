@@ -194,23 +194,50 @@ python scripts/narrative_lint.py out/shots.json --production
 **可生成性红线**（命中直接扣）：手部特写 −1.5、画面内文字 −2.0、三人以上 −1.0、
 精细机械 −1.0、清晰倒影 −0.5、复杂透视 −0.5、品牌/IP −2.0。
 
-### ⑦ 批量出图（ImageGen）
+### ⑦ 批量出图（`media_api.py` · 混元文生图）
 
-一次并发 **4–8 个**，每条用唯一前缀 `s07a_`；出完裁水印（右下角）、人工筛、不合格换备选。
+**不再调用内置 ImageGen**，全部走第三方网关。配置、模型参数、费用见 `references/15-media-api.md`。
+
+```bash
+# 1) 从分镜表生成出图清单（image_prompt → images/sNN.png）
+python scripts/media_api.py jobs --kind image --shots out/shots.json \
+    --out-dir images --size 1920x1080 --out work/image_jobs.json
+# 2) 并发出图，断点续跑；有失败就修完重跑同一条命令，已完成项自动跳过
+python scripts/media_api.py batch --jobs work/image_jobs.json --concurrency 4
+```
+
+- 正片镜 `1920x1080`（16:9 原生），封面 `1024x1536`（3:4）；总像素 ≤ 420 万。
+- `n` 只能为 1，"多候选"靠多条提示词多次调用；候选命名沿用唯一前缀 `s07a_`。
+- 出完**先检测水印再决定裁不裁**（不要盲套固定 crop 值），再人工筛，不合格换备选。
+- 只是局部脏（水印、杂物、多一只手）可以用 `edit` 子命令局部修，不必整张重出。
 
 **图出完不停顿**：全部裁完、抽检合格 → **直接进 ⑧**，不要问"要不要开始生成分段视频"。
 批量中途也不问"继续下一批吗"——批次是执行细节，不是决策点。
 
-### ⑧ 批量出视频（VideoGen）
+### ⑧ 批量出视频（`media_api.py` · Kling / MiniMax）
 
-**前置条件只有一条：关2 的样张已获确认（全片默认 AI 生成随之生效），且关3 分镜已定。**
+**不再调用内置 VideoGen。前置条件：关2 样张已确认（全片默认 AI 生成随之生效）、关3 分镜已定，
+且首帧已有公网 URL 或配好上传钩子**（`15-media-api.md` 第三节，这是换接口后唯一的新前置）。
 满足就直接开跑。**"是否开始生成分段视频"这个问题不应存在**——它在关2/关3 已经答过了。
+
+默认档位：`kling-video-v3` + `1080P` + `enable_audio=false` + `watermark=false`，`seconds=6`。
+省钱档：`minimax-video-h3` + `768P`（要接受清晰度折损与可能残留的生成音轨）。
+
+```bash
+python scripts/media_api.py jobs --shots out/shots.json \
+    --images-dir images --out-dir clips_raw --out work/video_jobs.json
+python scripts/media_api.py batch --jobs work/video_jobs.json --concurrency 4
+```
+
+视频是**异步任务**：提交拿 `task_id` → 每 5 秒轮询 → 完成立刻下载（签名 URL 会过期）。
+脚本会先把 `task_id` 写进 `<产物>.json` 侧车文件，**中断后用 `wait` 续等或重跑 batch，
+绝不重新提交**——重复提交就是重复计费。`batch` 结束会汇总全部 `credit`。
 
 全片沿用同一套材质语言：**每镜都「场景图 → 图生视频」**，不用静帧推拉凑镜、不混外部素材
 （用户主动提供素材时另算；个别镜连崩才退 zoompan 兜底，见 `03-generation.md` 第四节）。
 中途只在验收不过时动手，不回头征询。
 
-提示词**只写运动**，机位默认锁死，`seconds=6 / 1080P / audio=false`。
+提示词**只写运动**，机位默认锁死；`aspect_ratio` 只在文生视频时传，图生视频幅面由首帧决定。
 **每镜抽首帧和末帧**核对四件事——静帧看不出来，只能靠这一步把关：
 
 | 崩法 | 表现 |
@@ -369,7 +396,8 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 
 1. **不许手算时间戳**：所有 start/idx 来自工具回包或 timeline.json。
 2. **不许凭肉眼判断素材规格**：分辨率/帧率/时长/音轨一律实测。
-3. **单镜不超过 6 秒**（AI 生成上限 6.04s）。
+3. **单镜默认不超过 6 秒**：这是节奏要求，不是接口上限。网关支持 4–15 秒，
+   真要拉长必须同步改 timeline 并写明理由，不能顺手把节奏拖垮。
 4. **每一镜都要有备选**：没有备选时你会不自觉地"凑合"，凑合就是成片的上限。
 5. **先出样张再批量**：3 张 vs 40 张，差 10 倍成本。
 6. **片头歌名长在画面里**：不许用 ASS 标题卡压画面。
@@ -395,6 +423,9 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 21. **发布必须回流**：完整版与预告分开评估；评论问题只留一个具体的问题，不用“AI 制作”当开头卖点。
 22. **关2/关3 通过后不再征询**：不问"是否全部用 AI 生成"，不问"是否开始生成分段视频"，
     不问"这一批出完继续吗"。一次点头覆盖后续执行，**只在关4 交片时收口**。
+23. **生成一律走 `scripts/media_api.py`**：不再调用内置 ImageGen / VideoGen；
+    图生视频首帧必须是公网 http(s) URL；提交结果不确定（502）时不许盲目重提，
+    先查任务与积分，续等用 `wait`，重试用 `batch` 续跑。
 
 ---
 
@@ -430,6 +461,7 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 | `01-brief.md` | 拿到素材，要做分析和风格选择 |
 | `02-scoring.md` | **每一层打分之前**（含红线表、淘汰规则、JSON 格式） |
 | `03-generation.md` | 写提示词、批量出图出视频 |
+| `15-media-api.md` | **出图/出视频前必读**：网关配置、四个模型可选参数、首帧公网 URL、费用与错误处理 |
 | `04-assembly.md` | 拼时间轴、混音、渲染 |
 | `04a-timeline.md` | timeline.json 字段规范；**前奏 >8 秒怎么填信息、最强镜前移、信息密度** |
 | `04b-alignment.md` | 歌词对不齐、人声分离、起音校正 |
@@ -453,6 +485,17 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 ## 七、脚本速查
 
 ```bash
+# 生成（第三方媒体网关，配置见 references/15-media-api.md）
+python scripts/media_api.py models                       # 自检地址与 Key
+python scripts/media_api.py image --prompt-file work/s07_image.txt --size 1920x1080 --out images/s07.png
+python scripts/media_api.py edit --input images/s07.png --prompt "去掉右下角水印" --out images/s07_fix.png
+python scripts/media_api.py video --prompt-file work/s07_motion.txt \
+    --first-frame images/s07.png --seconds 6 --out clips_raw/s07.mp4
+python scripts/media_api.py jobs --kind image --shots out/shots.json --out-dir images --out work/image_jobs.json
+python scripts/media_api.py jobs --shots out/shots.json --out work/video_jobs.json
+python scripts/media_api.py batch --jobs work/video_jobs.json --concurrency 4   # 断点续跑
+python scripts/media_api.py wait --task-id <ID> --out clips_raw/s07.mp4         # 超时续等，不重提
+
 # 分析
 python scripts/mediainfo.py assets/ -o out/manifest.json
 python scripts/song_structure.py --audio song.m4a -o out/structure.json
@@ -505,3 +548,7 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 
 **工期按 2–4 小时报，不要报「几十分钟」**——重试是常态，不是意外。
 **任何一环不合格就重做，不因为多花时间而接受次品。**
+
+> 上表是旧内置工具的实测。切到第三方网关后，视频是**异步任务**：
+> 提交很快，等待占大头，`batch` 可以并发等，所以实际工期以第一次实测为准，
+> 成本以任务返回的 `credit` 汇总为准（`work/video_jobs.json.report.json`）。

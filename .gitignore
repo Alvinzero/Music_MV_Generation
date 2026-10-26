@@ -1,6 +1,9 @@
 __pycache__/
 *.pyc
 .DS_Store
+# 网关密钥：只允许 example 进仓库，真实配置一律留本地
+media_api.local.json
+*.local.json
 # 本地产物
 out/
 images/

@@ -17,7 +17,7 @@ burn per-character-synced lyrics, then ship a cover and a QC-checked MP4.
 ## What it is
 
 An **agent skill**, not a double-clickable app. `SKILL.md` is the workflow an AI agent follows;
-`references/` holds the per-stage playbooks (20 files); `scripts/` holds 36 runnable tools.
+`references/` holds the per-stage playbooks (21 files); `scripts/` holds 37 runnable tools.
 The division of labour is deliberate:
 
 - **The model decides; the tools measure.** Timing, specs and loudness are always measured,
@@ -57,8 +57,10 @@ Five mechanisms that make the output look intentional rather than generated:
 
 - Python 3.10+ with `Pillow`, `numpy`, `pymupdf` (PDF/render helpers)
 - `ffmpeg` on `PATH` (timeline, loudness, QC)
-- Image and video generation are external capabilities (ImageGen / VideoGen); the scripts only
-  compute parameters, align time and assemble the film
+- Generation goes through a third-party media gateway via `scripts/media_api.py`
+  (Hunyuan text-to-image / image edit, Kling / MiniMax video) — the built-in ImageGen / VideoGen
+  tools are no longer used. Base URL, API key, model parameters, first-frame URL rules and
+  costs are documented in `references/15-media-api.md`
 
 ## Quickstart (3 minutes, no credits)
 
@@ -104,8 +106,8 @@ python scripts/make_subs.py --lines out/lines_sync.json --style auto --out out/s
 
 ```
 SKILL.md          the workflow (what the agent reads)
-references/       20 playbooks: scoring, subtitle styles, title cards, pitfalls…
-scripts/          36 tools: timeline, align, subtitles, render, QC, cover…
+references/       21 playbooks: scoring, subtitle styles, title cards, media API, pitfalls…
+scripts/          37 tools: media API, timeline, align, subtitles, render, QC, cover…
 assets/           fonts and example briefs
 docs/results/     the samples above
 ```
