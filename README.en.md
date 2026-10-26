@@ -32,6 +32,11 @@ The division of labour is deliberate:
 → ⑨title card → ⑩timeline → ⑪subtitles ═gate 4═ → ⑫QC → ⑬cover & copy → ⑭review
 ```
 
+**Gate 2 is a one-time authorisation**: approving the three test frames also locks in
+"the whole film is AI-generated", so the agent never asks again how to produce the shots.
+**After gate 3 there is no further question until gate 4**: prompts → stills → clips → title →
+timeline → subtitles run as one continuous pass. Stills done means clips start immediately.
+
 Five mechanisms that make the output look intentional rather than generated:
 
 1. **Three-layer scoring** (style / story / single shot) with hard red lines, e.g. a shot that
