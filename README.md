@@ -140,7 +140,7 @@ references/
   13-douyin-storyboard.md 双轨分镜卡：推流任务 + 生成执行
   14-douyin-review.md     发布后数据复盘：分段流失归因与结论回流
   15-media-api.md         第三方生成网关：配置、模型参数、首帧 URL、费用与错误处理
-scripts/                  37 个脚本（见下）
+scripts/                  39 个脚本（见下）
 assets/fonts/             MV Serif SC（衬线）、站酷快乐体
 assets/*.example.json     lines.json / beats.json / 抖音分镜与评分示例 / 网关配置模板
 ```
@@ -150,6 +150,8 @@ assets/*.example.json     lines.json / beats.json / 抖音分镜与评分示例 
 | 脚本 | 干什么 |
 |---|---|
 | `media_api.py` | 第三方生成网关：文生图 / 图生图 / 视频提交轮询下载、批量清单与断点续跑、credit 汇总 |
+| `upload_frame.py` | 首帧图床上传（18080 HTTP 通道，零依赖）：stdout 只回一行 URL，供批量脚本当钩子用 |
+| `remove_label.py` | 去掉右下角「AI生成 / WORKBUDDY」标：只裁底部 + cover 不回弹，图片/视频/整目录 |
 | `mediainfo.py` / `song_structure.py` / `beat_sync.py` | 素材体检、曲式与镜数、拍点 |
 | `style_advisor.py` | 31 套风格里出候选 |
 | `score_candidates.py` | 按权重算候选分、标红线、排序；`--layer douyin` 检查推流剧情证据 |

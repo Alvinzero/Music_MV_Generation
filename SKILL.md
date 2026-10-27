@@ -83,7 +83,7 @@ agent_created: true
 | 某镜崩了，要不要重试？ | **换备选提示词重出单镜**，不整批重来，不问 |
 | 要不要用静帧推拉 / 外部素材补几镜？ | **不用**。全片同一材质语言；只有个别镜连崩才退 zoompan 兜底 |
 | 片头、时间轴、字幕之间还要确认吗？ | **不用**。一路做到关4 再给用户看 |
-| 时长/帧率/画幅按什么来？ | 16:9、24fps、单镜 6s、1080P、`audio=false`，音频用完整原曲 |
+| 时长/帧率/画幅按什么来？ | 16:9、24fps、1080P、`audio=false`，音频用完整原曲；**单镜 4–15s，按歌词与动作动态定** |
 
 > 只有两种情况值得停下来：**方向性选择**（风格、样张、叙事讲法、终版）和
 > **不可逆的高成本动作**（比如整批重出）。其余全部按默认推进，做完在交付说明里写清做了什么。
@@ -159,7 +159,31 @@ python scripts/score_candidates.py out/score.json --layer douyin   # 抖音推�
 | # | 起止 | 歌词 | 推流任务 | 观众疑问 | 画面（一句话） | 衔接/备选 |
 |---|---|---|---|---|---|---|
 
-时长规则：前奏 6–8s、主歌 5–6s、副歌 **3–3.5s**、桥/尾 6–8s，**单镜 ≤6 秒**（硬上限 6.04s）。
+**时长不是固定档位，是算出来的**（接口 4–15s，单镜槽位 ≤15s）。下表只是起手参考，
+真正的 `seconds` 由「剧情单元 / 歌词演唱时长 / 动作完成度 / 情绪停留」四者取**最大值**：
+
+| 段 | 参考槽位 | 说明 |
+|---|---|---|
+| 前奏 | 6–10s | 要填信息，长一点撑得住 |
+| 主歌 | 5–8s | 讲事情，镜头要留得住 |
+| 预副歌 | 4–5s | 开始加速，为副歌铺垫 |
+| **副歌** | **3–4s** | 切得密才有劲；槽位可 <4s，生成仍按 4s，多余帧裁尾 |
+| 桥 / 尾奏 | 8–12s | 一次生成拿到，**别用两个短镜拼** |
+
+四条判据（取最大，不许按「总时长 ÷ 镜数」平均切）：
+
+1. **歌词**：这镜要唱完的那句，演唱时长 L → `seconds ≥ ceil(L)`。**一句不许跨两镜唱**。
+2. **动作**：静态/微动 4s；单一动作 4–6s；复合动作（走两步再回头）6–10s；
+   段落级运动（长推轨、远景推到特写）10–15s。
+3. **情绪**：空镜、收尾、桥段需要「呼吸」的，8–12s 一次生成。拼接点一定会露，别用 6s 拼 12s。
+4. **剧情单元**：按「这镜在讲什么」定 —— 交代世界 8–15s、人物出场 6–10s、动作 4–8s、
+   反应 4–6s、转折 4–5s、留白 10–15s（`references/12-douyin-narrative.md` 4.1）。
+   判定用三问：一句话说得完吗？句子里有「然后」吗？3 秒内看得清主体吗？
+   **总时长对不上就调镜数，不压时长**——把 12 秒的戏切成两个 6 秒是旧规则的错，不是节奏。
+
+**镜内必须有变化**：单镜 >8s 必须写出至少两个阶段的画面变化（光移 / 纸片落 / 推轨），
+否则 15 秒里观众在等。>8s 的验收要抽**三帧**（首/中/末），亮度与几何漂移在长镜里会累积；
+>12s 只给静态空镜或极慢运动。
 
 **前奏超过 8 秒必须填信息**（`references/04a-timeline.md` 第 6 节）：
 概念字 / 成品预告 / 制作过程快剪，三选二（前奏 >20 秒时）。
@@ -207,9 +231,17 @@ python scripts/media_api.py batch --jobs work/image_jobs.json --concurrency 4
 ```
 
 - 正片镜 `1920x1080`（16:9 原生），封面 `1024x1536`（3:4）；总像素 ≤ 420 万。
+  **注意出图尺寸会被取整**：请求 1920x1080 实得 1920x1072，别假设拿到的是标称值。
 - `n` 只能为 1，"多候选"靠多条提示词多次调用；候选命名沿用唯一前缀 `s07a_`。
-- 出完**先检测水印再决定裁不裁**（不要盲套固定 crop 值），再人工筛，不合格换备选。
-- 只是局部脏（水印、杂物、多一只手）可以用 `edit` 子命令局部修，不必整张重出。
+- **出完必裁右下角「AI生成 / WORKBUDDY」标**（图片接口没有 watermark 参数，关不掉）：
+
+  ```bash
+  python scripts/remove_label.py --input images --output images
+  ```
+
+  这一步不能省、也不能放到出视频之后——带标的图当首帧，视频模型会把标"拍"进画面。
+  机制、坐标与验收阈值见 `15-media-api.md` 3.6。
+- 裁完再人工筛，不合格换备选。局部脏（杂物、多一只手）可用 `edit` 子命令修，不必整张重出。
 
 **图出完不停顿**：全部裁完、抽检合格 → **直接进 ⑧**，不要问"要不要开始生成分段视频"。
 批量中途也不问"继续下一批吗"——批次是执行细节，不是决策点。
@@ -218,20 +250,42 @@ python scripts/media_api.py batch --jobs work/image_jobs.json --concurrency 4
 
 **不再调用内置 VideoGen。前置条件：关2 样张已确认（全片默认 AI 生成随之生效）、关3 分镜已定，
 且首帧已有公网 URL 或配好上传钩子**（`15-media-api.md` 第三节，这是换接口后唯一的新前置）。
+图床自带 18080 HTTP 上传口且零依赖：配好 `MEDIA_UPLOAD_TOKEN`，再用
+`scripts/upload_frame.py` 当钩子（`MV_MEDIA_UPLOAD_CMD='python scripts/upload_frame.py --file {path}'`）即可，
+不需要 SSH、不装 paramiko。Token 缺失时 `upload_frame.py --check` 会直接说缺什么。
 满足就直接开跑。**"是否开始生成分段视频"这个问题不应存在**——它在关2/关3 已经答过了。
 
-默认档位：`kling-video-v3` + `1080P` + `enable_audio=false` + `watermark=false`，`seconds=6`。
-省钱档：`minimax-video-h3` + `768P`（要接受清晰度折损与可能残留的生成音轨）。
+默认档位：`kling-video-v3` + `1080P` + `enable_audio=false` + `watermark=false`，`seconds` 按镜头时长取整。
+**实测这档「出片即可用」**：1920×1080 / 24fps / 无音轨 / 无水印，22.86 积分/秒，进时间轴不用 scale。
+省钱档：`minimax-video-h3` + `768P`（1344×768 非 16:9、音轨关不掉、要裁底部 14%，14.29 积分/秒）。
+
+**并发窗口用 6，首帧不压缩。** 实测 6 条同时提交 1.1 秒完成、无 429、250 秒内全出片。
+图床下行慢（2.8 MB PNG 要 8–13 秒，抖动时会 40 秒不返回），上游可能判抓图失败——
+这个风险**交给失败重投兜住，不靠降画质规避**（原图 vs 1440/q92 差 4 dB）。
 
 ```bash
+python scripts/upload_frame.py --usage                     # 图床占用，只读；超线先清再跑
 python scripts/media_api.py jobs --shots out/shots.json \
-    --images-dir images --out-dir clips_raw --out work/video_jobs.json
-python scripts/media_api.py batch --jobs work/video_jobs.json --concurrency 4
+    --images-dir images/clean --out-dir clips_v2 --out work/video_jobs.json
+python scripts/media_api.py batch --jobs work/video_jobs.json \
+    --concurrency 6 --retry 3 --retry-delay 0
 ```
+
+`batch` 是**饱和式并发池**：6 个线程常驻，哪条挂了立刻重新入队，由最先空闲的线程马上补位，
+**不等整批跑完**（`--retry 3` = 单条最多重投 3 次，`--retry-delay 0` = 无间隔）。
+重投前会自动挪走 sidecar，否则会去轮询已经死掉的 task_id，白扔一次重试。
+**等待超时不重投**（上游可能还在跑，重投=重复计费），标 `timeout` 用 `wait` 续等。
+`--retry 3` 最坏等于单条付 4 次钱，预算按「总额 × 1.2」留量。
 
 视频是**异步任务**：提交拿 `task_id` → 每 5 秒轮询 → 完成立刻下载（签名 URL 会过期）。
 脚本会先把 `task_id` 写进 `<产物>.json` 侧车文件，**中断后用 `wait` 续等或重跑 batch，
 绝不重新提交**——重复提交就是重复计费。`batch` 结束会汇总全部 `credit`。
+
+**下载完查两件事**：① 右下角标是否还在（`watermark:false` 只关叠加层，首帧自带的标洗不掉），
+需要就 `remove_label.py --input clips_raw --output clips_new`；② 分辨率不是标称值
+（4s/768P 实得 1344×768、比例 1.75），进时间轴前统一 `scale` 到 1920×1080。
+**音轨不用管**：MiniMax 的音频是 always-on、`enable_audio:false` 关不掉，`remove_label.py` 已带 `-an`，
+整条流水线最后贴原曲即可。
 
 全片沿用同一套材质语言：**每镜都「场景图 → 图生视频」**，不用静帧推拉凑镜、不混外部素材
 （用户主动提供素材时另算；个别镜连崩才退 zoompan 兜底，见 `03-generation.md` 第四节）。
@@ -245,7 +299,7 @@ python scripts/media_api.py batch --jobs work/video_jobs.json --concurrency 4
 | 主体变形 | 纸片融化、角色换脸 |
 | 运镜跑偏 | 推过头把主体裁掉，或被拉远 |
 | 纹理糊掉 | 纸纹变塑料、边缘发毛 |
-| 亮度漂移 | 6 秒里越跑越亮，接下一镜像跳档 |
+| 亮度漂移 | 长镜里越跑越亮（>8s 尤其明显），接下一镜像跳档 |
 
 崩了就换备选提示词重出单镜，不要整批重来。
 
@@ -396,8 +450,11 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 
 1. **不许手算时间戳**：所有 start/idx 来自工具回包或 timeline.json。
 2. **不许凭肉眼判断素材规格**：分辨率/帧率/时长/音轨一律实测。
-3. **单镜默认不超过 6 秒**：这是节奏要求，不是接口上限。网关支持 4–15 秒，
-   真要拉长必须同步改 timeline 并写明理由，不能顺手把节奏拖垮。
+3. **单镜 4–15 秒，时长由内容决定**：接口上限 15s、下限 4s。按「歌词演唱时长 / 动作完成度 /
+   情绪停留」三者取最大（判据见 ⑤，细节见 `references/03-generation.md` 第一节），
+   **禁止按「总时长 ÷ 镜数」平均切**。槽位 >15s 必须拆镜（拆点选歌词换行或动作间隙）；
+   槽位 <4s（副歌快切）照常保留节奏，生成按 4s、多余帧在时间轴裁尾。
+   时长直接决定成本（Kling 1080P 约 22.86 积分/秒），拉长前先算钱。
 4. **每一镜都要有备选**：没有备选时你会不自觉地"凑合"，凑合就是成片的上限。
 5. **先出样张再批量**：3 张 vs 40 张，差 10 倍成本。
 6. **片头歌名长在画面里**：不许用 ASS 标题卡压画面。
@@ -490,7 +547,7 @@ python scripts/media_api.py models                       # 自检地址与 Key
 python scripts/media_api.py image --prompt-file work/s07_image.txt --size 1920x1080 --out images/s07.png
 python scripts/media_api.py edit --input images/s07.png --prompt "去掉右下角水印" --out images/s07_fix.png
 python scripts/media_api.py video --prompt-file work/s07_motion.txt \
-    --first-frame images/s07.png --seconds 6 --out clips_raw/s07.mp4
+    --first-frame images/s07.png --seconds 8 --out clips_raw/s07.mp4   # 秒数按内容算，4–15
 python scripts/media_api.py jobs --kind image --shots out/shots.json --out-dir images --out work/image_jobs.json
 python scripts/media_api.py jobs --shots out/shots.json --out work/video_jobs.json
 python scripts/media_api.py batch --jobs work/video_jobs.json --concurrency 4   # 断点续跑
@@ -541,7 +598,7 @@ python scripts/quality_check.py out/final.mp4 --expect 1920x1080 --fps 24 --lufs
 |---|---|---|
 | 风格样张 ×3（与用户迭代） | 5 分钟/轮 | 最多 3 轮 |
 | 场景图（每镜 1 张） | 40 镜约 20 分钟 | 并发 4–8 |
-| 图生视频（6s） | 40 镜约 60–90 分钟 | 逐镜抽首末帧验收 |
+| 图生视频（4–15s 动态） | 40 镜约 60–100 分钟 | 逐镜抽首末帧；>8s 加抽中帧 |
 | 片头（图 + 视频 + 验收） | 15 分钟 | 不过就重做 |
 | 封面（按 07b 直出 1 张） | 5 分钟 | 逐字核对 |
 | **40 镜全片** | **2–4 小时** | 含重试 |

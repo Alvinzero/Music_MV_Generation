@@ -17,7 +17,7 @@ burn per-character-synced lyrics, then ship a cover and a QC-checked MP4.
 ## What it is
 
 An **agent skill**, not a double-clickable app. `SKILL.md` is the workflow an AI agent follows;
-`references/` holds the per-stage playbooks (21 files); `scripts/` holds 37 runnable tools.
+`references/` holds the per-stage playbooks (21 files); `scripts/` holds 39 runnable tools.
 The division of labour is deliberate:
 
 - **The model decides; the tools measure.** Timing, specs and loudness are always measured,
@@ -107,7 +107,7 @@ python scripts/make_subs.py --lines out/lines_sync.json --style auto --out out/s
 ```
 SKILL.md          the workflow (what the agent reads)
 references/       21 playbooks: scoring, subtitle styles, title cards, media API, pitfalls…
-scripts/          37 tools: media API, timeline, align, subtitles, render, QC, cover…
+scripts/          39 tools: media API, frame upload, watermark trim, timeline, align, subtitles, render, QC, cover…
 assets/           fonts and example briefs
 docs/results/     the samples above
 ```

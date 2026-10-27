@@ -24,11 +24,14 @@ import argparse
 import base64
 import concurrent.futures
 import json
+import math
 import mimetypes
 import os
+import queue
 import re
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -423,9 +426,16 @@ def cmd_jobs(cfg, args):
             log("  跳过 %s：没有 motion_prompt" % sid)
             continue
         seconds = args.seconds
-        for key in ("seconds", "duration"):
-            if isinstance(shot.get(key), (int, float)) and shot[key] > 0:
-                seconds = int(round(shot[key]))
+        # 镜头时长优先取 shots.json 的 dur（老版本只认 seconds/duration，导致全落默认值）。
+        # 向上取整：取整会让 clip 比时间轴槽位短一帧，拼片时露黑边。
+        lo = max(1, int(getattr(args, "min_seconds", 4) or 4))
+        hi = int(getattr(args, "max_seconds", 15) or 15)
+        if hi < lo:
+            raise MediaError("--max-seconds(%d) 小于 --min-seconds(%d)" % (hi, lo), 2)
+        for key in ("seconds", "duration", "dur"):
+            val = shot.get(key)
+            if isinstance(val, (int, float)) and val > 0:
+                seconds = max(lo, min(hi, int(math.ceil(val - 1e-6))))
                 break
         jobs.append({
             "id": sid,
@@ -494,29 +504,133 @@ def _run_job(cfg, args, job):
     return {"out": out, "status": "ok", "credit": (res or {}).get("credit")}
 
 
+def _park_sidecar(out, tag):
+    """把 sidecar 挪走，让下一次 _run_job 走「重新提交」而不是「续等」。
+
+    失败任务的 sidecar 里仍留着 status=submitted 的旧 task_id，
+    不挪走的话重投会去轮询那个已经死掉的任务，白耗一次重试。
+    """
+    path = out + ".json"
+    if not os.path.isfile(path):
+        return
+    try:
+        os.replace(path, "%s.failed-%s" % (path, tag))
+    except OSError:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 def cmd_batch(cfg, args):
+    """并发池 + 失败立刻回队：并发数始终占满，不等整批跑完再重试。
+
+    用 Queue 的 unfinished 计数做闸门：任一 worker 判定失败后，
+    先把任务重新入队（unfinished +1）再 task_done（-1），
+    这样 queue.join() 不会在重投入队前误判「全部结束」，
+    挂掉的那条会被最先空闲的 worker 马上捡走，中间没有并发空窗。
+    """
     with open(args.jobs, "r", encoding="utf-8") as fh:
         jobs = json.load(fh)
-    log("共 %d 条任务，并发 %d" % (len(jobs), args.concurrency))
-    results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-        futures = {pool.submit(_run_job, cfg, args, job): job for job in jobs}
-        for future in concurrent.futures.as_completed(futures):
-            job = futures[future]
+    retry = max(0, int(getattr(args, "retry", 0) or 0))
+    delay = max(0, int(getattr(args, "retry_delay", 0) or 0))
+    workers = max(1, int(args.concurrency))
+    log("共 %d 条，并发 %d，单条最多重投 %d 次，失败立刻回队%s"
+        % (len(jobs), workers, retry, ("（间隔 %ds）" % delay) if delay else "（无间隔）"))
+
+    q = queue.Queue()
+    for job in jobs:
+        q.put(job)
+
+    results = {}
+    attempts = {}
+    lock = threading.Lock()
+    t0 = time.monotonic()
+
+    def handle(job):
+        out = job["out"]
+        name = os.path.basename(out)
+        with lock:
+            attempts[out] = attempts.get(out, 0) + 1
+            n = attempts[out]
+        if n > 1:
+            _park_sidecar(out, "r%d" % (n - 1))
+            log("[重投 %d] %s" % (n, name))
+        try:
+            res = _run_job(cfg, args, job)
+        except Exception as exc:  # noqa: BLE001  单条异常不能炸整批
+            code = getattr(exc, "code", None)
+            msg = str(exc)
+            if code == EXIT_TIMEOUT:
+                # 可能是上游还在跑，重投=重复计费。留给 wait 续等。
+                log("[超时] %s 不重投，用 wait 续等" % name)
+                with lock:
+                    results[out] = {"out": out, "status": "timeout", "error": msg,
+                                    "code": code, "attempts": n}
+                return
+            if n <= retry:
+                if delay:
+                    time.sleep(delay)
+                log("[FAIL %d/%d] %s -> %s；重新入队"
+                    % (n, retry + 1, name, msg.replace("\n", " ")[:150]))
+                q.put(job)          # 先入队（unfinished +1）
+                return              # worker 的 finally 再 task_done（-1）
+            log("[FAIL] %s 重投 %d 次仍失败：%s" % (name, n - 1, msg.replace("\n", " ")[:200]))
+            _park_sidecar(out, "final")
+            with lock:
+                results[out] = {"out": out, "status": "failed", "error": msg,
+                                "code": code, "attempts": n}
+            return
+        res.setdefault("attempts", n)
+        with lock:
+            results[out] = res
+        if n > 1:
+            log("[重投成功] %s（第 %d 次）" % (name, n))
+
+    def worker():
+        while True:
+            job = q.get()
+            if job is None:
+                q.task_done()
+                return
             try:
-                results.append(future.result())
-            except MediaError as exc:
-                log("[FAIL] %s -> %s" % (job.get("out"), exc))
-                results.append({"out": job.get("out"), "status": "failed", "error": str(exc), "code": exc.code})
-    credit = sum(r.get("credit") or 0 for r in results)
-    failed = [r for r in results if r["status"] == "failed"]
-    report = {"total": len(results), "failed": len(failed), "credit": credit, "results": results}
+                handle(job)
+            except Exception as exc:  # noqa: BLE001
+                log("[ERROR] %s -> %s: %s" % (job.get("out"), type(exc).__name__, exc))
+                with lock:
+                    results.setdefault(job["out"], {"out": job["out"], "status": "failed",
+                                                    "error": "%s: %s" % (type(exc).__name__, exc)})
+            finally:
+                q.task_done()
+
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(workers)]
+    for th in threads:
+        th.start()
+    q.join()
+    for _ in threads:
+        q.put(None)
+    for th in threads:
+        th.join()
+
+    ordered = [results[o] for o in (j["out"] for j in jobs) if o in results]
+    credit = sum(r.get("credit") or 0 for r in ordered)
+    failed = [r for r in ordered if r["status"] == "failed"]
+    timeouts = [r for r in ordered if r["status"] == "timeout"]
+    resubmits = sum(max(0, (r.get("attempts") or 1) - 1) for r in ordered)
+    elapsed = round(time.monotonic() - t0, 1)
+    report = {"total": len(ordered), "failed": len(failed), "timeout": len(timeouts),
+              "credit": credit, "resubmits": resubmits, "elapsed_seconds": elapsed,
+              "results": ordered}
     report_path = args.report or (args.jobs + ".report.json")
     with open(report_path, "w", encoding="utf-8") as fh:
         json.dump(report, fh, ensure_ascii=False, indent=2)
-    log("完成 %d / 失败 %d，累计 credit=%s，报告 %s" % (len(results) - len(failed), len(failed), credit, report_path))
-    if failed:
-        raise MediaError("有 %d 条失败，详情见报告。修好后重跑同一命令即可，已完成项会跳过。" % len(failed), 1)
+    log("完成 %d / 失败 %d / 超时 %d，共重投 %d 次，credit=%s，耗时 %.0fs，报告 %s"
+        % (len(ordered) - len(failed) - len(timeouts), len(failed), len(timeouts),
+           resubmits, credit, elapsed, report_path))
+    if failed or timeouts:
+        raise MediaError("失败 %d 条、超时 %d 条（报告 %s）。失败项已挪走 sidecar，"
+                         "重跑同一命令会重新提交；超时项请用 wait 续等，别重投。" %
+                         (len(failed), len(timeouts), report_path), 1)
 
 
 # ---------------------------------------------------------------- CLI
@@ -580,6 +694,8 @@ def build_parser():
     sp.add_argument("--images-dir", default="images")
     sp.add_argument("--out-dir", default="clips_raw")
     sp.add_argument("--out", required=True)
+    sp.add_argument("--min-seconds", default=4, help="单镜最短秒数，默认 4（接口下限）")
+    sp.add_argument("--max-seconds", default=15, help="单镜最长秒数，默认 15（接口上限）")
     sp.add_argument("--model", default="kling-video-v3", choices=VIDEO_MODELS)
     sp.add_argument("--seconds", type=int, default=6)
     sp.add_argument("--resolution", default="1080P")
@@ -589,8 +705,11 @@ def build_parser():
 
     sp = sub.add_parser("batch", help="并发生成，断点续跑")
     sp.add_argument("--jobs", required=True)
-    sp.add_argument("--concurrency", type=int, default=4)
+    sp.add_argument("--concurrency", type=int, default=6)
     sp.add_argument("--report", default=None)
+    sp.add_argument("--retry", type=int, default=3, help="失败自动重投轮数，默认 3，0 关闭")
+    sp.add_argument("--retry-delay", type=int, default=0,
+                    help="重投前等待秒数，默认 0（失败立刻回队，保持并发占满）")
     sp.add_argument("--timeout", type=int, default=1800)
     sp.add_argument("--interval", type=int, default=5)
     sp.add_argument("--upload-cmd", default=None)

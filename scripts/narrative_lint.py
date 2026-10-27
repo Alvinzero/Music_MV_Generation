@@ -65,7 +65,8 @@ def main():
     ap.add_argument("shots_json")
     ap.add_argument("--production", action="store_true", help="额外检查生图/视频提示词、备选和验收")
     ap.add_argument("--strict", action="store_true", help="警告也按错误处理")
-    ap.add_argument("--max-shot", type=float, default=6.04)
+    ap.add_argument("--max-shot", type=float, default=15.0,
+                    help="单镜槽位上限，默认 15（网关 4–15s）；旧默认 6.04 是内置生成器的限制")
     ap.add_argument("-o", "--out", default="")
     a = ap.parse_args()
 
@@ -97,6 +98,8 @@ def main():
             errors.append(f"{sid}: 镜头时长必须大于 0")
         elif dur > a.max_shot + 1e-6:
             errors.append(f"{sid}: {dur:.3f}s 超过单镜上限 {a.max_shot:.2f}s")
+        elif dur > 10:
+            warns.append(f"{sid}: {dur:.2f}s 长镜，验收要抽首/中/末三帧（漂移会累积）")
         if role in {"hook", "payoff", "comment"} and not s.get("audience_question"):
             errors.append(f"{sid}: {role} 必须填写 audience_question")
         if s.get("repeat_of") and not s.get("upgrade"):

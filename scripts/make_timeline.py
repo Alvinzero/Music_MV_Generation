@@ -32,7 +32,9 @@ def main():
     ap.add_argument("--bounds", required=True, help="逗号分隔的切点，含首尾")
     ap.add_argument("--beats", required=True)
     ap.add_argument("--total", type=float, required=True)
-    ap.add_argument("--clip-len", type=float, default=6.04, help="单段素材实际时长")
+    ap.add_argument("--clip-len", default="6.04",
+                    help="单段素材实际时长：一个数字，或逗号分隔的每镜实测值（顺序与 bounds 一致）。"
+                         "镜头时长现在是 4–15s 动态的，务必传每镜实测值")
     ap.add_argument("--fade", type=float, default=0.5)
     ap.add_argument("--no-snap", action="store_true", help="不吸附拍点")
     ap.add_argument("--fadeblack", default="", help="需要黑场过渡的转场序号，如 5,8")
@@ -57,11 +59,21 @@ def main():
     durs[-1] = round(a.total - sum(durs[:-1]), 3)
 
     D = a.fade
+    # 素材时长可能是 4–15s 里任意值，单个数字只对「全片同一时长」成立。
+    lens = [float(x) for x in str(a.clip_len).split(",") if x.strip()]
+    if len(lens) == 1:
+        lens = lens * N
+        if abs(lens[0] - 6.04) < 1e-9:
+            print("提醒：--clip-len 用的是默认 6.04，动态时长下会算错慢放；"
+                  "建议传每镜实测值（逗号分隔）")
+    if len(lens) != N:
+        raise SystemExit("--clip-len 给了 %d 个值，但镜头有 %d 个，数量必须一致" % (len(lens), N))
+
     slow = {}
     for i in range(N):
         need = (durs[i] + D) if i < N - 1 else durs[i]
-        if need > a.clip_len:
-            slow[i + 1] = need / a.clip_len
+        if need > lens[i]:
+            slow[i + 1] = need / lens[i]
 
     fb = set(int(x) for x in a.fadeblack.split(",") if x.strip())
     lines = []
